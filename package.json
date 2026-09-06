@@ -1,0 +1,12 @@
+{
+  "name": "piano",
+  "private": true,
+  "description": "One web piano that people and AI agents play through the same keys.",
+  "scripts": {
+    "start": "npx --yes serve .",
+    "test": "node test/smoke.js"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.0"
+  }
+}
