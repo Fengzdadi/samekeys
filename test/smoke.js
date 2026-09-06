@@ -1,10 +1,10 @@
-// Runs piano.html in jsdom with a fake AudioContext. Checks input logic, not sound.
+// Runs index.html in jsdom with a fake AudioContext. Checks input logic, not sound.
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
 
-const html = fs.readFileSync(path.join(__dirname, '..', 'piano.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const t0 = Date.now();
 class FakeParam { constructor(v) { this.value = v; } setValueAtTime() {} linearRampToValueAtTime() {} setTargetAtTime() {} cancelScheduledValues() {} }
 class FakeNode {
@@ -84,6 +84,22 @@ async function main() {
   assert.ok(lit(61), 'Shift+t plays C#4');
   key('keyup', 't', 'KeyT'); await sleep(120);
   assert.ok(!lit(61));
+
+  // a note repeated later in the same phrase must still release on time (t: 0-240 ms, y: 250-740, t: 750-990)
+  await typeString('tyyt'); await sleep(350);
+  assert.ok(!lit(60), 'first C4 releases before its repeat');
+  assert.ok(lit(62), 'D4 is sounding meanwhile');
+  await sleep(700);
+  assert.strictEqual(d.querySelectorAll('.key.on').length, 0, 'repeated note releases at the end');
+  await sleep(300);
+  // and "-" still extends the onset it belongs to
+  await typeString('t--y'); await sleep(400);
+  assert.ok(lit(60), 'held note stays lit');
+  assert.ok(!lit(62));
+  await sleep(500);
+  assert.ok(!lit(60), 'held note releases when the hold ends');
+  assert.ok(lit(62), 'next note follows');
+  await sleep(400);
 
   // tempo change mid-phrase keeps going
   await typeString('tyuiopas'); await sleep(300);

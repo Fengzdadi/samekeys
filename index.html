@@ -40,7 +40,7 @@
     display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
     padding: 20px 28px 0;
   }
-  .how { margin: 0; max-width: 52ch; color: var(--ink-2); font-size: 13px; }
+  .how { margin: 0; max-width: 72ch; color: var(--ink-2); font-size: 13px; }
   .how b { font-weight: 500; color: var(--ink); }
   .controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .controls button, .tempo button {
@@ -155,9 +155,8 @@
 
 <header class="top">
   <p class="how">
-    Play with your mouse, or with the keyboard: <b>1–0, q–p, a–l, z–m</b> are the white keys from C2 up,
-    <b>t</b> is middle C, <b>Shift</b> adds a sharp, hold <b>Space</b> to sustain.<br>
-    Type quickly and the notes play in time: a space is a rest, <b>[ ]</b> plays a chord, <b>-</b> holds the last note.
+    <b>1–0 q–p a–l z–m</b> are the white keys from C2, <b>t</b> is middle C, <b>Shift</b> adds a sharp, <b>Space</b> sustains.<br>
+    Type fast to play in time: space is a rest, <b>[ ]</b> a chord, <b>-</b> a hold.
   </p>
   <div class="controls">
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
@@ -309,7 +308,7 @@
       src.playbackRate.value = Math.pow(2, (m - s.midi) / 12);
       src.connect(g);
       src.start(when);
-      return { stop(t) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.1); src.stop(t + 0.8); } };
+      return { when, stop(t) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.1); src.stop(t + 0.8); } };
     }
     const f = 440 * Math.pow(2, (m - 69) / 12);
     const o1 = ctx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = f;
@@ -318,7 +317,7 @@
     o1.connect(g); o2.connect(g2).connect(g);
     g.gain.setTargetAtTime(level * 0.12, when + 0.02, 0.8);
     o1.start(when); o2.start(when);
-    return { stop(t) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.12); o1.stop(t + 1); o2.stop(t + 1); } };
+    return { when, stop(t) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.12); o1.stop(t + 1); o2.stop(t + 1); } };
   }
 
   /* ---------- note state ---------- */
@@ -326,7 +325,7 @@
   const heldSet = new Set();       // physically held (pointer or key)
   const sustainedSet = new Set();  // released while the pedal was down
   const timers = new Set();
-  const offTimers = new Map();     // midi -> timer for scheduled releases
+  const offTimers = new Map();     // midi -> {voice, timer}: the latest scheduled release, so "-" can extend it
   let pedalDown = false, latch = false;
   const pedalOn = () => pedalDown || latch;
 
@@ -341,22 +340,35 @@
     const old = voices.get(m);
     if (old) old.stop(when);
     sustainedSet.delete(m);
-    voices.set(m, makeVoice(m, vel, when));
+    const v = makeVoice(m, vel, when);
+    voices.set(m, v);
     schedule((when - ctx.currentTime) * 1000, () => { keyOn(m, vel); logNote(m, when); trace(m, vel); });
+    return v;
   }
-  function noteOff(m, when) {
+  // Releases one onset. A typed phrase can queue several onsets of the same note ahead of time,
+  // so the voice is passed explicitly; by default it is whatever is sounding now.
+  function noteOff(m, when, voice = voices.get(m)) {
     if (!ready) return;
     when = when ?? ctx.currentTime;
-    schedule((when - ctx.currentTime) * 1000, () => keyOff(m));
-    const v = voices.get(m);
-    if (!v) return;
-    if (pedalOn()) { sustainedSet.add(m); return; }
-    v.stop(when);
-    voices.delete(m);
+    schedule((when - ctx.currentTime) * 1000, () => {
+      // Darken the key unless a later onset of the same note has already lit it.
+      const cur = voices.get(m);
+      if (!cur || cur === voice || cur.when > ctx.currentTime) keyOff(m);
+    });
+    if (!voice) return;
+    const current = voices.get(m) === voice;
+    if (pedalOn()) { if (current) sustainedSet.add(m); return; }
+    voice.stop(when);
+    if (current) voices.delete(m);
   }
-  function scheduleOff(m, when) {
-    clearTimeout(offTimers.get(m));
-    offTimers.set(m, schedule((when - ctx.currentTime) * 1000, () => { offTimers.delete(m); noteOff(m); }));
+  function scheduleOff(m, when, voice = voices.get(m)) {
+    const prev = offTimers.get(m);
+    if (prev && prev.voice === voice) { clearTimeout(prev.timer); timers.delete(prev.timer); }   // "-" extends this onset
+    const timer = schedule((when - ctx.currentTime) * 1000, () => {
+      if (offTimers.get(m)?.timer === timer) offTimers.delete(m);
+      noteOff(m, undefined, voice);
+    });
+    offTimers.set(m, { voice, timer });
   }
   function releaseSustained() {
     const now = ctx.currentTime;
@@ -374,7 +386,7 @@
     voices.clear(); sustainedSet.clear(); heldSet.clear(); immediateHeld.clear();
     for (const id of timers) clearTimeout(id);
     timers.clear();
-    for (const id of offTimers.values()) clearTimeout(id);
+    for (const p of offTimers.values()) clearTimeout(p.timer);
     offTimers.clear();
     for (const p of pendingRelease.values()) clearTimeout(p.timer);
     pendingRelease.clear();
@@ -464,8 +476,8 @@
     const m = charToMidi.get(ch);
     if (m == null) return;
     const when = at;
-    noteOn(m, 0.68 + Math.random() * 0.08, when);
-    scheduleOff(m, when + sd - 0.01);
+    const v = noteOn(m, 0.68 + Math.random() * 0.08, when);
+    scheduleOff(m, when + sd - 0.01, v);
     addPending(ch, when);
     if (typing.chord) typing.chord.push(m);
     else { typing.lastNotes = [m]; typing.slot = s + 1; }
