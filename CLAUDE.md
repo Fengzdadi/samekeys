@@ -2,7 +2,7 @@
 
 One web page, one instrument, no server. People play it with mouse, touch or keyboard. AI agents play it the same way, through computer use: screenshots and clicks, typed keystrokes, or DOM events. There is no API for agents, and there must not be one — making the page playable through ordinary human input is the whole idea.
 
-Everything lives in `piano.html` (CSS and JS inline). Keep it that way until a second file is clearly needed.
+Everything lives in `index.html` (CSS and JS inline). Keep it that way until a second file is clearly needed.
 
 ## What matters, in order
 
@@ -30,7 +30,7 @@ Everything lives in `piano.html` (CSS and JS inline). Keep it that way until a s
 
 ## How to test
 
-- Human: open `piano.html`, click Open the piano, play with mouse and keys.
+- Human: open `index.html`, click Open the piano, play with mouse and keys.
 - Agent: with Claude in Chrome, ask it to open the page and type `tyu [io]- p  s d f  [tuo]--`. Expect a phrase in time, chords landing together, keys lighting up, the played line filling in. JS-injected input must dispatch both `keydown` and `keyup`.
 - `npm test` runs the page in jsdom with a fake AudioContext (no sound) and checks the input logic: immediate play, typing tempo, chords, holds, rests, sharps, tempo change, sustain, pointer, synthetic clicks, offline fallback. Keep it green and extend it whenever the typing-tempo code changes.
 
