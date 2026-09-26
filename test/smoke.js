@@ -386,6 +386,58 @@ async function main() {
   await typeIn(A, 'tyu'); await sleep(40);   // well before D4 is due (250 ms)
   assert.ok(A.played().endsWith('C4'), 'alone, a typed phrase starts at once');
 
+  // --- a stage: one tab shows and plays every player; the players go quiet and send it their notes ---
+  const P1 = tab(load({ room: 'hall' })), P2 = tab(load({ room: 'hall' })), S = tab(load({ room: 'hall' }));
+  for (const t of [P1, P2, S]) t.d.getElementById('open').click();
+  await sleep(200);
+  pick(P2.d, 'Marimba'); await sleep(50);
+  S.d.getElementById('stage-toggle').click(); await sleep(50);
+  assert.strictEqual(S.d.title, 'Stage', 'the stage tab is titled Stage');
+  assert.ok(S.status().startsWith('Stage · 2 players'), 'the stage counts its players');
+  const stripOf = id => S.d.querySelector(`.strip[data-instrument="${id}"]`);
+  const stripLine = id => stripOf(id).querySelector('.strip-line').textContent;
+  assert.strictEqual(S.d.querySelectorAll('.strip').length, 2, 'one strip per player, not one for the stage');
+  assert.ok(stripOf('piano') && stripOf('marimba'), 'each strip takes its player\'s instrument');
+  assert.strictEqual(stripOf('marimba').querySelectorAll('.key').length, 61, 'a strip is the whole keyboard');
+  assert.strictEqual(stripOf('marimba').getAttribute('aria-label'), 'Marimba');
+  assert.strictEqual(P1.status(), 'Stage is open: sound comes from the stage · Other tab: Marimba',
+    'a player learns where the sound went, and still sees the other player, not the stage');
+
+  // live playing in a player tab lights its strip on the stage at once, and releases with it
+  P1.key('keydown', 'o'); await sleep(30);
+  assert.ok(P1.lit(67), 'the player still sees its own key');
+  assert.ok(stripOf('piano').querySelector('.key.on'), 'the stage lights the key on the player\'s strip');
+  assert.ok(stripLine('piano').endsWith('G4'), 'and writes it on the strip\'s line');
+  P1.key('keyup', 'o'); await sleep(200);
+  assert.ok(!stripOf('piano').querySelector('.key.on'), 'the key goes dark with the player\'s');
+
+  // parts wait; the stage conducts, and both play on it together
+  await typeIn(P1, 'tyu'); await typeIn(P2, 'qwe'); await sleep(100);
+  assert.ok(stripOf('piano').querySelector('.strip-name').textContent.includes('(ready)'), 'a strip shows its player is ready');
+  assert.ok(!stripLine('piano').endsWith('C4'), 'a held phrase\'s first note, taken back, leaves the strip too');
+  S.key('keydown', 'Enter', 'Enter'); S.key('keyup', 'Enter', 'Enter');
+  await sleep(50);
+  assert.ok(S.status().startsWith('Starting on the next bar'), 'the stage counts in too');
+  await sleep(5000);
+  assert.ok(stripLine('piano').endsWith('G4  C4  D4  E4'), 'the piano part plays on the stage');
+  assert.ok(stripLine('marimba').endsWith('F3  G3  A3'), 'and the marimba part with it');
+  assert.strictEqual(S.d.querySelectorAll('.strip .key.on').length, 0, 'and every key is released');
+
+  // the stage itself plays no notes from letters; Esc on the stage stops everyone
+  const before = stripLine('piano');
+  S.key('keydown', 't'); S.key('keyup', 't'); await sleep(100);
+  assert.strictEqual(stripLine('piano'), before, 'letters typed on the stage play nothing');
+  assert.strictEqual(S.played(), '', 'not even on the stage\'s own keyboard');
+  await typeIn(P2, 'rty'); await sleep(50);
+  S.key('keydown', 'Escape', 'Escape'); await sleep(50);
+  assert.strictEqual(P2.held(), '', 'Esc on the stage clears the players\' waiting parts');
+
+  // leaving the stage: back to a player, and the others hear themselves again
+  S.d.getElementById('stage-toggle').click(); await sleep(50);
+  assert.strictEqual(S.d.querySelectorAll('.strip').length, 0, 'the strips go');
+  assert.strictEqual(P1.status(), 'Other tabs: Marimba, Piano', 'no stage any more');
+  assert.strictEqual(S.d.title, 'Piano');
+
   console.log('ok');
   process.exit(0);
 }

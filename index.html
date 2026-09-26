@@ -103,8 +103,9 @@
 
   /* Materials. Every instrument draws from these tokens; the piano is the default. Only colours,
      faces and decoration change between instruments: key buttons keep the same boxes, so a click
-     that lands on C4 lands on C4 whatever is playing. */
-  .stage {
+     that lands on C4 lands on C4 whatever is playing. Anything marked data-instrument takes the
+     instrument's materials: the page itself, and each player's strip on the stage. */
+  .stage, .strip {
     --room-top: var(--wall-top); --room: var(--wall);   /* the wall behind the instrument */
     --band: linear-gradient(#2A2620, #14110E 45%, #0F0D0A);
     --band-pad: 0px;
@@ -129,7 +130,7 @@
     --sharp-press: var(--brass-light); --sharp-press-min: .8; --sharp-label-on: var(--ink);
   }
   /* Electric piano: black tolex, a brushed aluminium name rail, square plastic keys. */
-  .stage[data-instrument="epiano"] {
+  [data-instrument="epiano"] {
     --room-top: #E6E7E8; --room: #D0D3D5;
     --band: repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 1px, rgba(0,0,0,.03) 1px 3px) 0 16px / 100% 100% no-repeat,
             linear-gradient(#D3D6D8, #B4B8BB 45%, #9DA1A5) 0 16px / 100% 100% no-repeat,
@@ -151,7 +152,7 @@
   /* Marimba: rosewood bars in two rows over a dark frame, resonators hanging below, longest in the bass.
      A bar is drawn inside its button: bars narrow and shorten up the range (--g runs 0..1 from C2 to C7),
      and the naturals sit below the row of accidentals, so no bar is drawn under another key's button. */
-  .stage[data-instrument="marimba"] {
+  [data-instrument="marimba"] {
     --room-top: #EFE8DB; --room: #DDD2BF;
     --band: linear-gradient(#2E241F, #1B1512);
     --band-line: #0E0B09;
@@ -175,14 +176,14 @@
     --sharp-press-min: .9;
   }
   /* the taper uses each key's own --g, so it is declared on the keys */
-  .stage[data-instrument="marimba"] .key.white { --face-inset: calc(64% + var(--g) * 10%) calc(2px + var(--g) * 14%) 2px; }
-  .stage[data-instrument="marimba"] .key.black {
+  [data-instrument="marimba"] .key.white { --face-inset: calc(64% + var(--g) * 10%) calc(2px + var(--g) * 14%) 2px; }
+  [data-instrument="marimba"] .key.black {
     --face-inset: 2px calc(1px + var(--g) * 12%) calc(36% + var(--g) * 20%);
     --sharp-label-bottom: calc(36% + var(--g) * 20% + 6px);
   }
   /* Harpsichord, French style: reversed keys (ebony naturals, bone sharps) with arcaded fronts, a painted
      green case with gilt bands. Ebony keys would vanish into the dark well, so each has a pale seam. */
-  .stage[data-instrument="harpsichord"] {
+  [data-instrument="harpsichord"] {
     --room-top: #E7E9E1; --room: #D3D8CC;
     --band: linear-gradient(#C9A24E, #C9A24E) 0 6px / 100% 2px no-repeat,
             linear-gradient(#C9A24E, #C9A24E) 0 calc(100% - 6px) / 100% 2px no-repeat,
@@ -208,7 +209,7 @@
   }
   /* Organ: a cherry cabinet with a row of drawbars (a picture of the registration the sound uses, not
      a control), flat-fronted waterfall keys. */
-  .stage[data-instrument="organ"] {
+  [data-instrument="organ"] {
     --room-top: #EFE6DF; --room: #DDD0C6;
     --band: repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 9px, rgba(255,255,255,.03) 9px 11px, transparent 11px 17px),
             linear-gradient(#8A3F2A, #7A3423 50%, #5E2619);
@@ -228,7 +229,7 @@
   /* Music box: one chromatic comb. Steel teeth hang from the comb bar under a pinned brass cylinder,
      naturals and blued sharps interleaved, shortening up the range; a crank turns the cylinder. The
      natural teeth are narrow enough to stay clear of the sharps' buttons. */
-  .stage[data-instrument="musicbox"] {
+  [data-instrument="musicbox"] {
     --room-top: #F1E8E5; --room: #E0D2CD;
     --band: radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 0 5px / 23px 4px repeat-x,
             radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 9px 11px / 31px 4px repeat-x,
@@ -252,20 +253,52 @@
     --sharp-label: #fff;
     --sharp-press-min: 1;
   }
-  .stage[data-instrument="musicbox"] .key.white {
+  [data-instrument="musicbox"] .key.white {
     --face-inset: 0 calc(29% + 1px) calc(var(--g) * 34%);
     --natural-label-bottom: calc(var(--g) * 34% + 8px);
   }
-  .stage[data-instrument="musicbox"] .key.black {
+  [data-instrument="musicbox"] .key.black {
     --face-inset: 0 14% calc(var(--g) * 30%);
     --sharp-label-bottom: calc(var(--g) * 30% + 6px);
   }
   /* a natural tooth can be narrower than its letter, so the letter sits on a small steel tag at the tip */
-  .stage[data-instrument="musicbox"] .key.white .lab {
+  [data-instrument="musicbox"] .key.white .lab {
     left: 50%; right: auto; transform: translateX(-50%); min-width: 11px; padding: 0 2px;
     line-height: 14px; border-radius: 3px; background: #D5D9DC;
   }
-  .stage[data-instrument="musicbox"] .key.white.on .lab { background: var(--natural-press); }
+  [data-instrument="musicbox"] .key.white.on .lab { background: var(--natural-press); }
+
+  /* Stage: this tab shows and plays every player; its own keyboard steps aside. A warm dark room, brass
+     names, each player a full keyboard strip in its own materials, all strips aligned by pitch, so a
+     chord across players lines up. */
+  .stage[data-mode="stage"] {
+    --ink: #EFE6D2; --ink-2: #CFC5AE;   /* text on the dark room, 10:1 or better */
+    background: linear-gradient(#26201B, #15110E);
+  }
+  .stage[data-mode="stage"] :is(.how, .fallboard, .keys-wrap, .played, .traces, #sustain, #labels) { display: none; }
+  .stage[data-mode="stage"] .controls button[aria-pressed="true"] { background: rgba(239,230,210,.12); border-color: rgba(239,230,210,.3); }
+  .stage[data-mode="stage"] .controls button:hover { background: rgba(239,230,210,.08); }
+  .stage[data-mode="stage"] .count { top: 8px; transform: none; text-align: right; font-size: 44px; }
+  .stage[data-mode="stage"] .count.next { font-size: 18px; top: 16px; }
+  .strips { display: none; }
+  .stage[data-mode="stage"] .strips {
+    display: flex; flex-direction: column; gap: 16px;
+    position: absolute; inset: 64px 28px 20px; overflow-y: auto;
+  }
+  .strip { margin: 0; }
+  .strip-name {
+    margin: 0 0 6px; font-family: var(--serif); font-weight: 500; font-size: 17px; letter-spacing: .06em;
+    color: var(--brass-light);
+  }
+  .strip-name .ready { font-family: var(--sans); font-size: 12px; letter-spacing: 0; color: var(--ink-2); margin-left: 8px; }
+  .strip .keys { height: 64px; min-width: 0; padding: 0 0 4px; background: var(--well); border-radius: 3px; }
+  .strip .keys::after { display: none; }
+  .strip .key { cursor: default; }
+  .strip-line {
+    margin: 6px 0 0; font-size: 14px; color: var(--ink); white-space: pre; overflow: hidden;
+    font-variant-numeric: tabular-nums; letter-spacing: .02em;
+  }
+  .strips-empty { margin: 0; color: var(--ink-2); font-size: 14px; }
 
   /* fallboard: lacquer, felt, the instruments' names */
   .fallboard {
@@ -412,6 +445,7 @@
   </p>
   <div class="controls">
     <button type="button" id="agent-prompt">Copy agent prompt</button>
+    <button type="button" id="stage-toggle" aria-pressed="false">Stage</button>
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
     <button type="button" id="labels" aria-pressed="true">Labels</button>
     <div class="group" role="group" aria-label="Tempo">
@@ -427,6 +461,7 @@
   <div class="traces" id="traces" aria-hidden="true"></div>
   <p class="status" id="status" role="status"></p>
   <p class="count" id="count" aria-hidden="true"></p>
+  <div class="strips" id="strips" role="group" aria-label="Players"></div>
   <p class="played"><span id="played" role="log" aria-live="polite" aria-label="Played notes"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
 </div>
 
@@ -562,8 +597,8 @@
     useSynth = samples.length < 6;
   }
 
-  function makeVoice(m, vel, when) {
-    if (instrument.voice) return instrument.voice(m, vel, when);
+  function makeVoice(m, vel, when, inst = instrument) {
+    if (inst.voice) return inst.voice(m, vel, when);
     const level = 0.15 + 0.85 * Math.pow(vel, 1.5);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, when);
@@ -761,6 +796,7 @@
     if (old) old.stop(when);
     sustainedSet.delete(m);
     const v = makeVoice(m, vel, when);
+    shareNote(v, m, vel, when);
     voices.set(m, v);
     schedule((when - ctx.currentTime) * 1000, () => { if (!v.cut) { keyOn(m, vel); logNote(m, when); trace(m, vel); } });
     return v;
@@ -832,6 +868,9 @@
     const hadHeld = held.length > 0;
     held.length = 0;
     for (const el of keyEls.values()) el.classList.remove('on');
+    for (const e of stageVoices.values()) e.voice.stop(now);
+    stageVoices.clear();
+    for (const st of strips.values()) { st.lit.clear(); for (const el of st.keys.values()) el.classList.remove('on'); }
     renderQueue(); renderStatus();
     if (hadHeld) send('here');
   }
@@ -983,6 +1022,7 @@
       if (together() || held.length) { e.preventDefault(); countIn(); }
       return;
     }
+    if (stageMode) return;   // the stage conducts (Enter, Esc); the players play
     const ch = keyChar(e), id = keyId(e);
     if (ch.length !== 1) return;
     const mapped = charToMidi.has(ch) || ' []-|'.includes(ch);
@@ -1239,8 +1279,10 @@
   const togetherHow = document.getElementById('together-how');
   const countEl = document.getElementById('count');
   const together = () => peers.size > 0;
+  const players = () => [...peers.entries()].filter(([, p]) => p.role !== 'stage');
+  const stageOpen = () => [...peers.values()].some(p => p.role === 'stage');
   function send(type, extra) {
-    if (channel) channel.postMessage({ type, id: me, instrument: instrument.id, bpm, ready: held.length > 0, ...extra });
+    if (channel) channel.postMessage({ type, id: me, role: stageMode ? 'stage' : 'play', instrument: instrument.id, bpm, ready: held.length > 0, ...extra });
   }
   // Reads as one line of text ("Other tabs: Organ, Piano (ready)"); each other tab is also a tag,
   // the seed of a stage where every player shows up.
@@ -1250,8 +1292,12 @@
     countEl.textContent = countLine && (countText === 'next' ? countLine : countText);
     countEl.classList.toggle('next', countText === 'next');
     const parts = [countLine, fallbackNote].filter(Boolean);
-    const others = [...peers.values()];
-    if (others.length) {
+    const others = players().map(([, p]) => p);
+    if (stageMode) {
+      const n = others.length;
+      parts.push(`Stage · ${n} player${n === 1 ? '' : 's'} · Enter starts everyone, Esc stops`);
+    } else if (stageOpen()) parts.push('Stage is open: sound comes from the stage');
+    if (others.length && !stageMode) {
       const line = document.createDocumentFragment();
       line.append(others.length === 1 ? 'Other tab: ' : 'Other tabs: ');
       others.forEach((p, i) => {
@@ -1265,6 +1311,9 @@
     }
     statusEl.replaceChildren(...parts.flatMap((part, i) => i ? [' · ', part] : [part]));
     togetherHow.hidden = !together();
+    if (stageMode) renderStrips();
+    // with a stage open, a player stays silent: the stage plays everyone, once
+    if (master) master.gain.setTargetAtTime(!stageMode && stageOpen() ? 0 : 0.85, ctx.currentTime, 0.03);
   }
   // Wall-clock seconds minus audio-clock seconds, measured at the speaker when the browser can tell.
   function wallOffset() {
@@ -1312,17 +1361,161 @@
     renderQueue();
     send('here');
   }
+  /* ---------- the stage: one tab shows and plays every player ---------- */
+  // Any tab can become the stage. It plays nothing itself: each player tab sends it every note it
+  // sounds (pitch, velocity, and when it starts and stops, in wall-clock seconds) and stays silent,
+  // and the stage voices each note with that player's instrument and lights it on the player's strip.
+  // Its sound is the whole ensemble, once, in one tab, which is what a recording needs. A network
+  // relay can carry the same messages later.
+  let stageMode = false, noteSeq = 0;
+  function shareNote(v, m, vel, when) {
+    if (stageMode || !stageOpen()) return;
+    const n = ++noteSeq;
+    send('note', { n, midi: m, vel, at: when + wallOffset() });
+    const stop = v.stop;
+    v.stop = (t, tau) => { stop(t, tau); send('off', { n, at: t + wallOffset(), tau, cut: !!v.cut }); };
+  }
+  const stripsEl = document.getElementById('strips');
+  const strips = new Map();        // player id -> { el, name, line, keys: midi -> element, lit: midi -> count, groups }
+  const stageVoices = new Map();   // player id + note number -> { voice, m, st, when, lit, cut }
+  // A player's keyboard in miniature, in its own materials: the same keys as the page, not buttons.
+  function stripFor(id) {
+    if (strips.has(id)) return strips.get(id);
+    const el = document.createElement('section');
+    el.className = 'strip';
+    const name = document.createElement('p');
+    name.className = 'strip-name';
+    const box = document.createElement('div');
+    box.className = 'keys';
+    box.setAttribute('aria-hidden', 'true');
+    const keys = new Map();
+    const add = (m, cls) => {
+      const k = document.createElement('div');
+      k.className = 'key ' + cls;
+      k.style.setProperty('--g', ((m - LOW) / (HIGH - LOW)).toFixed(3));
+      keys.set(m, k);
+      box.appendChild(k);
+      return k;
+    };
+    whiteMidis.forEach(m => add(m, 'white'));
+    for (let m = LOW; m <= HIGH; m++) {
+      if (isWhite(m)) continue;
+      const k = add(m, 'black'), i = whiteMidis.indexOf(m - 1);
+      k.style.left = ((i + 1) * ww - bw / 2) + '%';
+      k.style.width = bw + '%';
+    }
+    const line = document.createElement('p');
+    line.className = 'strip-line';
+    el.append(name, box, line);
+    const st = { el, name, line, keys, lit: new Map(), groups: [] };
+    strips.set(id, st);
+    stripsEl.appendChild(el);
+    return st;
+  }
+  function renderStrips() {
+    const list = players();
+    for (const [id, st] of strips) if (!peers.has(id) || peers.get(id).role === 'stage') { st.el.remove(); strips.delete(id); }
+    for (const [id, p] of list) {
+      const st = stripFor(id), inst = INSTRUMENTS.find(i => i.id === p.instrument) || INSTRUMENTS[0];
+      st.el.dataset.instrument = inst.id;
+      st.el.setAttribute('aria-label', inst.name);
+      st.name.replaceChildren(inst.name);
+      if (p.ready) { const r = document.createElement('span'); r.className = 'ready'; r.textContent = '(ready)'; st.name.append(r); }
+    }
+    let empty = stripsEl.querySelector('.strips-empty');
+    if (!list.length && !empty) {
+      empty = document.createElement('p');
+      empty.className = 'strips-empty';
+      empty.textContent = 'No players yet. Open this page in other tabs, pick an instrument in each, and play.';
+      stripsEl.appendChild(empty);
+    }
+    if (list.length && empty) empty.remove();
+  }
+  function stripKey(st, m, vel, delta) {
+    const n = (st.lit.get(m) || 0) + delta, el = st.keys.get(m);
+    st.lit.set(m, Math.max(0, n));
+    if (!el) return;
+    if (delta > 0) el.style.setProperty('--v', vel.toFixed(2));
+    el.classList.toggle('on', n > 0);
+  }
+  function renderStripLine(st) {
+    st.line.textContent = st.groups.map(groupText).join('  ');
+    while (st.groups.length > 1 && st.line.scrollWidth > st.line.clientWidth) {
+      st.groups.shift();
+      st.line.textContent = st.groups.map(groupText).join('  ');
+    }
+  }
+  function stripLog(st, m, when) {
+    const last = st.groups[st.groups.length - 1];
+    if (last && Math.abs(last.t - when) < 0.012) { last.midis.push(m); last.midis.sort((x, y) => x - y); }
+    else st.groups.push({ t: when, midis: [m] });
+    if (st.groups.length > 40) st.groups.shift();
+    renderStripLine(st);
+  }
+  function stripUnlog(st, m, when) {
+    const g = st.groups.find(g => g.t === when);
+    if (!g) return;
+    g.midis = g.midis.filter(x => x !== m);
+    if (!g.midis.length) st.groups.splice(st.groups.indexOf(g), 1);
+    renderStripLine(st);
+  }
+  function stageNote(d) {
+    if (!ready) return;
+    const st = stripFor(d.id);
+    const inst = INSTRUMENTS.find(i => i.id === d.instrument) || INSTRUMENTS[0];
+    const when = Math.max(ctx.currentTime, d.at - wallOffset());
+    const e = { voice: makeVoice(d.midi, d.vel, when, inst), m: d.midi, st, when, lit: false, cut: false };
+    stageVoices.set(d.id + ':' + d.n, e);
+    schedule((when - ctx.currentTime) * 1000, () => {
+      if (e.cut) return;
+      e.lit = true;
+      stripKey(st, d.midi, d.vel, 1);
+      stripLog(st, d.midi, when);
+    });
+    renderStrips();
+  }
+  function stageOff(d) {
+    const key = d.id + ':' + d.n, e = stageVoices.get(key);
+    if (!e) return;
+    stageVoices.delete(key);
+    if (d.cut) {   // the player took the note back: the first note of a phrase it then held for Enter
+      e.cut = true;
+      e.voice.stop(ctx.currentTime, 0.01);
+      if (e.lit) { stripKey(e.st, e.m, 0, -1); stripUnlog(e.st, e.m, e.when); }
+      return;
+    }
+    const t = Math.max(ctx.currentTime, d.at - wallOffset());
+    e.voice.stop(t, d.tau);
+    schedule((t - ctx.currentTime) * 1000, () => { if (e.lit) stripKey(e.st, e.m, 0, -1); else e.cut = true; });
+  }
+  const stageBtn = document.getElementById('stage-toggle');
+  function setStage(on) {
+    if (!ready) return;
+    panic();   // this tab's own notes and waiting part end here
+    stageMode = on;
+    const main = document.querySelector('.stage');
+    main.dataset.mode = on ? 'stage' : 'play';
+    if (on) { main.dataset.instrument = 'stage'; document.title = 'Stage'; } else showInstrument();
+    stageBtn.setAttribute('aria-pressed', String(on));
+    stageBtn.textContent = on ? 'Leave stage' : 'Stage';
+    if (!on) { for (const st of strips.values()) st.el.remove(); strips.clear(); }
+    renderStatus();
+    send('here');
+  }
+  stageBtn.addEventListener('click', () => { setStage(!stageMode); stageBtn.blur(); });
   if (channel) {
     channel.onmessage = ({ data: d }) => {
       if (!d || d.id === me) return;
       if (d.type === 'bye') { peers.delete(d.id); renderStatus(); return; }
-      peers.set(d.id, { instrument: d.instrument, ready: d.ready, seen: Date.now() });
+      peers.set(d.id, { role: d.role, instrument: d.instrument, ready: d.ready, seen: Date.now() });
+      if (d.type === 'note') { if (stageMode) stageNote(d); return; }
+      if (d.type === 'off') { if (stageMode) stageOff(d); return; }
       if (d.type === 'hello') { tempoSettled = true; send('here'); }
       if (d.type === 'tempo' || d.type === 'start' || (d.type === 'here' && !tempoSettled)) {
         tempoSettled = true;
         if (d.bpm !== bpm) setTempo(d.bpm, false);
       }
-      if (d.type === 'start') start(d.at, false);
+      if (d.type === 'start') start(d.at, stageMode);   // the stage clicks the count-in, whoever pressed Enter
       if (d.type === 'stop') panic();
       renderStatus();
     };
