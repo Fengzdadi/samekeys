@@ -413,7 +413,8 @@ async function main() {
   assert.strictEqual(S.d.title, 'Stage', 'the stage tab is titled Stage');
   assert.ok(S.status().startsWith('Stage · 2 players'), 'the stage counts its players');
   const stripOf = id => S.d.querySelector(`.strip[data-instrument="${id}"]`);
-  const stripLine = id => stripOf(id).querySelector('.strip-line').textContent;
+  const stripLine = id => stripOf(id).querySelector('.strip-line span').textContent;   // the played notes
+  const stripWait = id => stripOf(id).querySelector('.strip-wait').textContent;          // the part waiting for Enter
   assert.strictEqual(S.d.querySelectorAll('.strip').length, 2, 'one strip per player, not one for the stage');
   assert.ok(stripOf('piano') && stripOf('marimba'), 'each strip takes its player\'s instrument');
   assert.strictEqual(stripOf('marimba').querySelectorAll('.key').length, 61, 'a strip is the whole keyboard');
@@ -432,11 +433,16 @@ async function main() {
   // parts wait; the stage conducts, and both play on it together
   await typeIn(P1, 'tyu'); await typeIn(P2, 'qwe'); await sleep(100);
   assert.ok(stripOf('piano').querySelector('.strip-name').textContent.includes('(ready)'), 'a strip shows its player is ready');
+  assert.strictEqual(stripWait('piano'), '   waiting: tyu', 'and the part it is holding, after what it has played');
+  assert.strictEqual(stripWait('marimba'), 'waiting: qwe', 'a player that has played nothing yet shows just its part');
+  assert.strictEqual(stripOf('marimba').querySelector('.strip-line').textContent, 'waiting: qwe', 'which reads as one line');
   assert.ok(!stripLine('piano').endsWith('C4'), 'a held phrase\'s first note, taken back, leaves the strip too');
   S.key('keydown', 'Enter', 'Enter'); S.key('keyup', 'Enter', 'Enter');
   await sleep(50);
   assert.ok(S.status().startsWith('Starting on the next bar'), 'the stage counts in too');
+  assert.strictEqual(stripWait('marimba'), 'waiting: qwe', 'the part stays on show through the count-in');
   await sleep(5000);
+  assert.strictEqual(stripWait('piano') + stripWait('marimba'), '', 'on the downbeat the notes take over from the waiting parts');
   assert.ok(stripLine('piano').endsWith('G4  C4  D4  E4'), 'the piano part plays on the stage');
   assert.ok(stripLine('marimba').endsWith('F3  G3  A3'), 'and the marimba part with it');
   assert.strictEqual(S.d.querySelectorAll('.strip .key.on').length, 0, 'and every key is released');

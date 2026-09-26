@@ -307,6 +307,7 @@
     margin: 6px 0 0; font-size: 14px; color: var(--ink); white-space: pre; overflow: hidden;
     font-variant-numeric: tabular-nums; letter-spacing: .02em;
   }
+  .strip-wait { color: var(--ink-2); }
   .strips-empty { margin: 0; color: var(--ink-2); font-size: 14px; }
 
   /* fallboard: lacquer, felt, the instruments' names */
@@ -966,7 +967,7 @@
   function hold(ch) {
     held.push(ch);
     renderQueue();
-    if (held.length === 1) send('here');
+    send('here');   // the other tabs, and a stage, see the part as it is typed
   }
 
   function typeToken(ch) {
@@ -1301,7 +1302,7 @@
   const players = () => [...peers.entries()].filter(([, p]) => p.role !== 'stage');
   const stageOpen = () => [...peers.values()].some(p => p.role === 'stage');
   function send(type, extra) {
-    if (channel) channel.postMessage({ type, id: me, role: stageMode ? 'stage' : 'play', instrument: instrument.id, bpm, ready: held.length > 0, ...extra });
+    if (channel) channel.postMessage({ type, id: me, role: stageMode ? 'stage' : 'play', instrument: instrument.id, bpm, ready: held.length > 0, part: held.join(''), ...extra });
   }
   // Reads as one line of text ("Other tabs: Organ, Piano (ready)"); each other tab is also a tag,
   // the seed of a stage where every player shows up.
@@ -1427,8 +1428,11 @@
     }
     const line = document.createElement('p');
     line.className = 'strip-line';
+    const played = document.createElement('span'), wait = document.createElement('span');
+    wait.className = 'strip-wait';
+    line.append(played, wait);
     el.append(name, box, line);
-    const st = { el, name, line, keys, lit: new Map(), groups: [] };
+    const st = { el, name, line, played, wait, waiting: '', keys, lit: new Map(), groups: [] };
     strips.set(id, st);
     stripsEl.appendChild(el);
     return st;
@@ -1442,6 +1446,9 @@
       st.el.setAttribute('aria-label', inst.name);
       st.name.replaceChildren(inst.name);
       if (p.ready) { const r = document.createElement('span'); r.className = 'ready'; r.textContent = '(ready)'; st.name.append(r); }
+      // a part stays on show through the count-in, until its notes take over on the downbeat
+      const waiting = p.part || (countText ? st.waiting : '');
+      if (waiting !== st.waiting) { st.waiting = waiting; renderStripLine(st); }
     }
     let empty = stripsEl.querySelector('.strips-empty');
     if (!list.length && !empty) {
@@ -1459,11 +1466,14 @@
     if (delta > 0) el.style.setProperty('--v', vel.toFixed(2));
     el.classList.toggle('on', n > 0);
   }
+  // The played notes, then the part the player is holding for Enter, so an audience sees what's coming.
+  // When the line is full, the oldest played notes go first; the waiting part stays whole.
   function renderStripLine(st) {
-    st.line.textContent = st.groups.map(groupText).join('  ');
+    st.wait.textContent = st.waiting ? (st.groups.length ? '   ' : '') + 'waiting: ' + st.waiting : '';
+    st.played.textContent = st.groups.map(groupText).join('  ');
     while (st.groups.length > 1 && st.line.clientWidth && st.line.scrollWidth > st.line.clientWidth) {
       st.groups.shift();
-      st.line.textContent = st.groups.map(groupText).join('  ');
+      st.played.textContent = st.groups.map(groupText).join('  ');
     }
   }
   function stripLog(st, m, when) {
@@ -1549,7 +1559,7 @@
     channel.onmessage = ({ data: d }) => {
       if (!d || d.id === me) return;
       if (d.type === 'bye') { if (stageMode) stageDrop(d.id); peers.delete(d.id); renderStatus(); return; }
-      peers.set(d.id, { role: d.role, instrument: d.instrument, ready: d.ready, seen: Date.now() });
+      peers.set(d.id, { role: d.role, instrument: d.instrument, ready: d.ready, part: d.part || '', seen: Date.now() });
       if (d.type === 'note') { if (stageMode) stageNote(d); return; }
       if (d.type === 'off') { if (stageMode) stageOff(d); return; }
       if (d.type === 'hello') { tempoSettled = true; send('here'); }
