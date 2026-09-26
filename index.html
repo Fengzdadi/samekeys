@@ -43,16 +43,17 @@
   .how { margin: 0; max-width: 72ch; color: var(--ink-2); font-size: 13px; }
   .how b { font-weight: 500; color: var(--ink); }
   .controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .controls button, .tempo button {
+  .controls button, .group button {
     font: inherit; font-size: 13px; color: var(--ink);
     background: none; border: 1px solid transparent; border-radius: 999px;
     padding: 5px 11px; cursor: pointer;
   }
   .controls button:hover { background: rgba(43,40,35,.06); }
   .controls button[aria-pressed="true"] { background: rgba(43,40,35,.10); border-color: rgba(43,40,35,.18); }
-  .tempo { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; color: var(--ink-2); font-size: 13px; }
-  .tempo button { padding: 3px 9px; }
-  .tempo output { min-width: 3ch; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .group { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; color: var(--ink-2); font-size: 13px; }
+  .group:first-child { margin: 0 8px 0 0; }
+  .group button { padding: 3px 9px; }
+  .group output { min-width: 3ch; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
   button:focus-visible, .key:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
   /* the wall: traces rise, played notes read out */
@@ -159,9 +160,13 @@
     Type fast to play in time: space is a rest, <b>[ ]</b> a chord, <b>-</b> a hold.
   </p>
   <div class="controls">
+    <div class="group">
+      <span>Instrument</span>
+      <button type="button" id="instrument" aria-label="Instrument: Piano">Piano</button>
+    </div>
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
     <button type="button" id="labels" aria-pressed="true">Labels</button>
-    <div class="tempo">
+    <div class="group">
       <span>Tempo</span>
       <button type="button" id="slower" aria-label="Slower">−</button>
       <output id="bpm">120</output>
@@ -252,6 +257,8 @@
   }
 
   /* ---------- audio ---------- */
+  const INSTRUMENTS = [{ id: 'piano', name: 'Piano' }, { id: 'epiano', name: 'Electric piano' }];
+  let instrument = INSTRUMENTS[0];
   let ctx = null, master = null, ready = false, opening = false, useSynth = false;
   const samples = [];
   const nearest = m => samples.reduce((a, s) => Math.abs(s.midi - m) < Math.abs(a.midi - m) ? s : a);
@@ -277,7 +284,7 @@
         const buffer = await fetchSample(name);
         if (buffer) {
           samples.push({ midi: m, buffer }); done++; onProgress(done, list.length);
-          if (useSynth && samples.length >= 6) { useSynth = false; statusEl.textContent = ''; }
+          if (useSynth && samples.length >= 6) { useSynth = false; fallbackNote = ''; renderStatus(); }
         }
         if (++settled === list.length) { clearTimeout(timer); resolve(); }
       });
@@ -296,6 +303,7 @@
   }
 
   function makeVoice(m, vel, when) {
+    if (instrument.id === 'epiano') return electricPiano(m, vel, when);
     const level = 0.15 + 0.85 * Math.pow(vel, 1.5);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, when);
@@ -308,7 +316,7 @@
       src.playbackRate.value = Math.pow(2, (m - s.midi) / 12);
       src.connect(g);
       src.start(when);
-      return { when, stop(t) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.1); src.stop(t + 0.8); } };
+      return { when, stop(t, tau = 0.1) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tau); src.stop(t + 8 * tau); } };
     }
     const f = 440 * Math.pow(2, (m - 69) / 12);
     const o1 = ctx.createOscillator(); o1.type = 'triangle'; o1.frequency.value = f;
@@ -317,7 +325,39 @@
     o1.connect(g); o2.connect(g2).connect(g);
     g.gain.setTargetAtTime(level * 0.12, when + 0.02, 0.8);
     o1.start(when); o2.start(when);
-    return { when, stop(t) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, 0.12); o1.stop(t + 1); o2.stop(t + 1); } };
+    return { when, stop(t, tau = 0.12) { g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tau); o1.stop(t + 8 * tau); o2.stop(t + 8 * tau); } };
+  }
+  // Two-operator FM, the classic tine-piano recipe: a 1:1 modulator gives the bark that fades into a
+  // sine, and a brief 14:1 modulator gives the metallic tine strike. Harder hits are brighter.
+  const EP_GAIN = 0.8, EP_DECAY = 1.8, EP_RELEASE = 0.07;
+  function electricPiano(m, vel, when) {
+    const f = 440 * Math.pow(2, (m - 69) / 12);
+    const level = EP_GAIN * (0.15 + 0.85 * Math.pow(vel, 1.5));
+    const bright = vel * Math.min(1, Math.max(0.3, 1 - (m - 72) / 36));   // tame the top octave
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(level, when + 0.003);
+    g.gain.setTargetAtTime(level * 0.55, when + 0.003, 0.18);                        // quick drop after the strike
+    g.gain.setTargetAtTime(0, when + 0.3, EP_DECAY * (1.3 - (m - LOW) / (HIGH - LOW)));  // long tail, shorter up high
+    g.connect(master);
+    const car = ctx.createOscillator(); car.frequency.value = f;
+    const bark = ctx.createOscillator(); bark.frequency.value = f;
+    const barkG = ctx.createGain();
+    barkG.gain.setValueAtTime(f * (0.4 + 2.2 * bright), when);
+    barkG.gain.setTargetAtTime(f * 0.15, when, 0.3);
+    bark.connect(barkG).connect(car.frequency);
+    const tine = ctx.createOscillator(); tine.frequency.value = f * 14 < 16000 ? f * 14 : f * 7;
+    const tineG = ctx.createGain();
+    tineG.gain.setValueAtTime(f * 1.2 * bright, when);
+    tineG.gain.setTargetAtTime(0, when, 0.02);
+    tine.connect(tineG).connect(car.frequency);
+    car.connect(g);
+    const oscs = [car, bark, tine];
+    oscs.forEach(o => o.start(when));
+    return { when, stop(t, tau = EP_RELEASE) {
+      g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tau);
+      oscs.forEach(o => o.stop(t + 8 * tau));
+    } };
   }
 
   /* ---------- note state ---------- */
@@ -342,7 +382,7 @@
     sustainedSet.delete(m);
     const v = makeVoice(m, vel, when);
     voices.set(m, v);
-    schedule((when - ctx.currentTime) * 1000, () => { keyOn(m, vel); logNote(m, when); trace(m, vel); });
+    schedule((when - ctx.currentTime) * 1000, () => { if (!v.cut) { keyOn(m, vel); logNote(m, when); trace(m, vel); } });
     return v;
   }
   // Releases one onset. A typed phrase can queue several onsets of the same note ahead of time,
@@ -369,6 +409,21 @@
       noteOff(m, undefined, voice);
     });
     offTimers.set(m, { voice, timer });
+  }
+  // Silences an immediate note that turned out to be the first character of a phrase moved to the next bar.
+  function takeBack(m) {
+    const v = voices.get(m);
+    if (!v) return;
+    v.cut = true;
+    v.stop(ctx.currentTime, 0.01);
+    voices.delete(m);
+    keyOff(m);
+    const g = groups.find(g => g.t === v.when);
+    if (g) {
+      g.midis = g.midis.filter(x => x !== m);
+      if (!g.midis.length) groups.splice(groups.indexOf(g), 1);
+      renderPlayed();
+    }
   }
   function releaseSustained() {
     const now = ctx.currentTime;
@@ -452,6 +507,7 @@
   /* ---------- typing in time ---------- */
   let bpm = 120;
   const slotDur = () => 60 / bpm / 2;               // one character = one eighth note
+  const barDur = () => 60 / bpm * 4;
   const typing = { active: false, anchor: 0, slot: 0, chord: null, lastNotes: [], pending: [] };
   function addPending(ch, when) { typing.pending.push({ ch, when }); renderQueue(); }
 
@@ -459,7 +515,11 @@
     const sd = slotDur(), s = typing.slot;
     let at = typing.anchor + s * sd;
     // If the grid has fallen behind real time, move it 60 ms ahead so the rest of this slot (a chord being typed) lands together.
-    if (at < ctx.currentTime + 0.005) { const shift = ctx.currentTime + 0.06 - at; typing.anchor += shift; at += shift; }
+    // With other tabs open, move it by whole eighths instead, so it stays on the shared grid.
+    if (at < ctx.currentTime + 0.005) {
+      const shift = (together() ? nextOnGrid(ctx.currentTime + 0.03, sd) : ctx.currentTime + 0.06) - at;
+      typing.anchor += shift; at += shift;
+    }
     if (ch === '[') { if (!typing.chord) { typing.chord = []; addPending('[', at); } return; }
     if (ch === ']') {
       if (typing.chord) { typing.lastNotes = typing.chord; typing.chord = null; addPending(']', at); typing.slot = s + 1; }
@@ -483,12 +543,17 @@
     else { typing.lastNotes = [m]; typing.slot = s + 1; }
   }
 
-  function setTempo(next) {
+  function setTempo(next, share = true) {
     next = Math.min(200, Math.max(60, next));
     const oldSd = slotDur();
     bpm = next;
-    if (typing.active) typing.anchor += typing.slot * (oldSd - slotDur());   // keep the next slot where it was
+    if (typing.active) {
+      const at = typing.anchor + typing.slot * oldSd;
+      // Keep the next slot where it was, or with other tabs open, move it to the nearest point on the new shared grid.
+      typing.anchor = (together() ? nextOnGrid(Math.max(at, ctx.currentTime + 0.03), slotDur()) : at) - typing.slot * slotDur();
+    }
     document.getElementById('bpm').value = bpm;
+    if (share) { tempoSettled = true; send('tempo'); }
   }
 
   /* ---------- computer keyboard ---------- */
@@ -512,16 +577,21 @@
     if (!typing.active) {
       if (gap < TYPE_GAP && heldSet.size === 0 && lastChar !== null) {
         // The previous keystroke was the start of a typed phrase: make it slot 0.
+        // Alone, the phrase starts where that keystroke did. With other tabs open, it starts on the next shared bar.
         typing.active = true;
-        typing.anchor = lastDownAudio; typing.slot = 0; typing.chord = null; typing.lastNotes = []; typing.pending = [];
+        typing.anchor = together() ? nextOnGrid(ctx.currentTime + 0.05, barDur()) : lastDownAudio;
+        typing.slot = 0; typing.chord = null; typing.lastNotes = []; typing.pending = [];
         const prev = charToMidi.get(lastChar);
         if (prev != null) {
           const pr = pendingRelease.get(lastCode);
           if (pr) { clearTimeout(pr.timer); pendingRelease.delete(lastCode); }
           immediateHeld.delete(lastCode); heldSet.delete(prev);
-          typing.lastNotes = [prev]; typing.slot = 1;
-          addPending(lastChar, typing.anchor);
-          scheduleOff(prev, typing.anchor + slotDur() - 0.01);
+          if (together()) { takeBack(prev); typeToken(lastChar); }
+          else {
+            typing.lastNotes = [prev]; typing.slot = 1;
+            addPending(lastChar, typing.anchor);
+            scheduleOff(prev, typing.anchor + slotDur() - 0.01);
+          }
         } else if (lastChar === '[') { typing.chord = []; addPending('[', typing.anchor); }
         else if (lastChar === ' ' || lastChar === '-') { addPending(lastChar, typing.anchor); typing.slot = 1; }
       }
@@ -616,6 +686,14 @@
   });
 
   /* ---------- controls ---------- */
+  const instrumentBtn = document.getElementById('instrument');
+  instrumentBtn.addEventListener('click', () => {
+    instrument = INSTRUMENTS[(INSTRUMENTS.indexOf(instrument) + 1) % INSTRUMENTS.length];
+    instrumentBtn.textContent = instrument.name;
+    instrumentBtn.setAttribute('aria-label', 'Instrument: ' + instrument.name);
+    instrumentBtn.blur();
+    send('here');
+  });
   const sustainBtn = document.getElementById('sustain');
   function updatePedalUI() { sustainBtn.setAttribute('aria-pressed', String(pedalOn())); }
   sustainBtn.addEventListener('click', () => {
@@ -650,9 +728,52 @@
     ready = true;
     gate.classList.add('hide');
     setTimeout(() => gate.remove(), 600);
-    if (useSynth) statusEl.textContent = 'Piano samples didn’t load, so this uses a built-in tone.';
+    if (useSynth) { fallbackNote = 'Piano samples didn’t load, so this uses a built-in tone.'; renderStatus(); }
   }
   openBtn.addEventListener('click', openPiano);
+
+  /* ---------- other tabs: the same page open elsewhere on this computer plays in time with this one ---------- */
+  // Tabs find each other over BroadcastChannel, share the tempo, and start typed phrases on the same bar.
+  // Bars are counted from the wall clock, so every tab agrees on where they fall without a server.
+  const me = Math.random().toString(36).slice(2);
+  const peers = new Map();   // id -> {instrument, seen}
+  const channel = 'BroadcastChannel' in window ? new BroadcastChannel('samekeys') : null;
+  let tempoSettled = false;  // a new tab takes the tempo of the tabs already open
+  let fallbackNote = '';
+  const together = () => peers.size > 0;
+  function send(type) { if (channel) channel.postMessage({ type, id: me, instrument: instrument.id, bpm }); }
+  function renderStatus() {
+    const others = [...peers.values()].map(p => (INSTRUMENTS.find(i => i.id === p.instrument) || INSTRUMENTS[0]).name);
+    statusEl.textContent = [fallbackNote, others.length ? 'In time with ' + others.join(', ') : ''].filter(Boolean).join(' · ');
+  }
+  // Wall-clock seconds minus audio-clock seconds, measured at the speaker when the browser can tell.
+  function wallOffset() {
+    const ts = ctx.getOutputTimestamp && ctx.getOutputTimestamp();
+    if (ts && ts.contextTime > 0) return (performance.timeOrigin + ts.performanceTime) / 1000 - ts.contextTime;
+    return Date.now() / 1000 - ctx.currentTime;
+  }
+  // The first point at or after audio time t on the shared grid of the given step (a bar, an eighth).
+  function nextOnGrid(t, step) {
+    const off = wallOffset();
+    return Math.ceil((t + off) / step - 1e-6) * step - off;
+  }
+  if (channel) {
+    channel.onmessage = ({ data: d }) => {
+      if (!d || d.id === me) return;
+      if (d.type === 'bye') { peers.delete(d.id); renderStatus(); return; }
+      peers.set(d.id, { instrument: d.instrument, seen: Date.now() });
+      if (d.type === 'hello') { tempoSettled = true; send('here'); }
+      if (d.type === 'tempo' || (d.type === 'here' && !tempoSettled)) { tempoSettled = true; if (d.bpm !== bpm) setTempo(d.bpm, false); }
+      renderStatus();
+    };
+    send('hello');
+    setInterval(() => {
+      for (const [id, p] of peers) if (Date.now() - p.seen > 75000) peers.delete(id);   // background tabs tick slowly
+      renderStatus();
+      send('here');
+    }, 4000);
+    addEventListener('pagehide', () => send('bye'));
+  }
 })();
 </script>
 </body>

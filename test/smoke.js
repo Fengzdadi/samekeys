@@ -19,11 +19,13 @@ class FakeCtx {
   createBufferSource() { return new FakeNode(); } createOscillator() { return new FakeNode(); }
   decodeAudioData() { return Promise.resolve({ duration: 1 }); }
 }
-function load({ offline = false } = {}) {
+// Each group of windows gets its own channel name, so windows from earlier checks don't join later ones.
+function load({ offline = false, room = 'solo' } = {}) {
   const dom = new JSDOM(html, {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost/',
     beforeParse(w) {
       w.AudioContext = FakeCtx;
+      w.BroadcastChannel = class extends BroadcastChannel { constructor(name) { super(name + ':' + room); } };
       w.matchMedia = () => ({ matches: false });
       w.fetch = offline
         ? () => Promise.reject(new Error('offline'))
@@ -124,6 +126,20 @@ async function main() {
   d.getElementById('labels').click();
   assert.ok(!d.body.classList.contains('labels'), 'labels toggle off');
 
+  // electric piano plays on the same keys
+  const inst = d.getElementById('instrument');
+  inst.click();
+  assert.strictEqual(inst.getAttribute('aria-label'), 'Instrument: Electric piano');
+  key('keydown', 'u'); await sleep(30);
+  assert.ok(lit(64), 'electric piano plays');
+  key('keyup', 'u'); await sleep(150);
+  assert.ok(!lit(64), 'electric piano releases');
+  await typeString('tyu'); await sleep(900);
+  assert.ok(played().endsWith('C4  D4  E4'), 'electric piano plays a typed phrase');
+  inst.click();
+  assert.strictEqual(inst.textContent, 'Piano', 'instrument cycles back');
+  assert.strictEqual(d.getElementById('status').textContent, '', 'alone: no ensemble status');
+
   // --- offline: synth fallback ---
   w = load({ offline: true }); d = w.document;
   d.getElementById('open').click(); await sleep(200);
@@ -131,6 +147,49 @@ async function main() {
   d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 't', code: 'KeyT', bubbles: true, cancelable: true }));
   await sleep(30);
   assert.ok(d.querySelector('[data-midi="60"]').classList.contains('on'), 'synth fallback still plays');
+
+  // --- two tabs: shared tempo, typed phrases start on the same wall-clock bar ---
+  const a = load({ room: 'duo' }), b = load({ room: 'duo' });
+  const tab = win => ({
+    d: win.document,
+    key: (type, k) => win.document.dispatchEvent(new win.KeyboardEvent(type, { key: k, code: codeFor(k), bubbles: true, cancelable: true })),
+    played: () => win.document.getElementById('played').textContent,
+    status: () => win.document.getElementById('status').textContent,
+    bpm: () => win.document.getElementById('bpm').textContent,
+  });
+  const A = tab(a), B = tab(b);
+  const typeIn = async (t, s) => { for (const ch of s) { t.key('keydown', ch); t.key('keyup', ch); await sleep(12); } };
+  A.d.getElementById('open').click(); B.d.getElementById('open').click();
+  await sleep(200);
+  assert.strictEqual(A.status(), 'In time with Piano', 'tabs find each other');
+  B.d.getElementById('instrument').click(); await sleep(50);
+  assert.strictEqual(A.status(), 'In time with Electric piano', 'the other tab\'s instrument is shown');
+  A.d.getElementById('faster').click(); await sleep(50);
+  assert.strictEqual(B.bpm(), '130', 'tempo is shared');
+  A.d.getElementById('slower').click(); await sleep(50);
+  assert.strictEqual(B.bpm(), '120');
+  // 120 bpm: a bar is 2 s on the wall clock. Type into A 200 ms into a bar and into B 500 ms later.
+  while (Date.now() % 2000 < 150 || Date.now() % 2000 > 250) await sleep(5);
+  const bar = Math.ceil(Date.now() / 2000) * 2000;
+  await typeIn(A, 'tyu');
+  await sleep(500);
+  await typeIn(B, 'qwe');
+  await sleep(bar - Date.now() - 150);
+  assert.strictEqual(A.played(), '', 'A waits for the bar, its first keystroke taken back');
+  assert.strictEqual(B.played(), '', 'B waits for the same bar');
+  assert.ok(A.d.getElementById('queue').textContent.includes('tyu'), 'the waiting phrase is shown');
+  await sleep(250);
+  assert.strictEqual(A.played(), 'C4', 'A starts on the bar');
+  assert.strictEqual(B.played(), 'F3', 'B starts on the same bar');
+  await sleep(600);
+  assert.strictEqual(A.played(), 'C4  D4  E4');
+  assert.strictEqual(B.played(), 'F3  G3  A3');
+  // live playing stays immediate with other tabs open
+  A.key('keydown', 'o'); await sleep(30);
+  assert.ok(A.d.querySelector('[data-midi="67"]').classList.contains('on'), 'immediate note with other tabs open');
+  A.key('keyup', 'o');
+  b.dispatchEvent(new b.Event('pagehide')); await sleep(50);
+  assert.strictEqual(A.status(), '', 'a closed tab leaves');
 
   console.log('ok');
   process.exit(0);
