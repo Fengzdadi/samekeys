@@ -62,6 +62,7 @@ async function main() {
   const main = d.querySelector('main').textContent;
   assert.ok(main.includes('middle C') && main.includes('Open the piano') && main.includes('Sustain') && main.includes('Harpsichord'),
     'main holds the whole instrument, so tools that read "main" see the instructions, controls and lid');
+  assert.ok(main.includes('1–0 q–p a–l z–m are the natural keys'), 'the key legend reads as a sentence');
   d.getElementById('open').click();
   await sleep(200);
   assert.ok(d.getElementById('gate').classList.contains('hide'), 'gate hides after opening');
@@ -170,6 +171,7 @@ async function main() {
   for (const name of ['Harpsichord', 'Organ', 'Marimba', 'Music box']) {
     pick(d, name);
     assert.strictEqual(picked(d), name);
+    assert.strictEqual(d.title, name, 'the tab title names the instrument');
     assert.strictEqual(d.getElementById('keys').getAttribute('aria-label'), name + ' keys', 'the keyboard group names the instrument');
     key('keydown', 'u'); await sleep(30);
     assert.ok(lit(64), name + ' plays');
@@ -239,8 +241,13 @@ async function main() {
   while (Date.now() % 2000 < 150 || Date.now() % 2000 > 250) await sleep(5);
   const downbeat = (Math.ceil(Date.now() / 2000) + 1) * 2000;
   A.key('keydown', 'Enter', 'Enter'); A.key('keyup', 'Enter', 'Enter');
+  await sleep(50);
+  assert.ok(A.status().startsWith('Starting on the next bar') && B.status().startsWith('Starting on the next bar'),
+    'right after Enter, both tabs say the music starts on the next bar');
+  assert.strictEqual(A.d.getElementById('count').textContent, 'Starting on the next bar', 'and show it large on the wall');
   await sleep(2000 - Date.now() % 2000 + 600);   // into the count-in bar, which is the next full bar
   assert.ok(/^Count-in [1-4]/.test(A.status()) && /^Count-in [1-4]/.test(B.status()), 'both tabs count in');
+  assert.ok(/^[1-4]$/.test(B.d.getElementById('count').textContent), 'the beat is shown large');
   const aBefore = A.played(), bBefore = B.played();
   await sleep(downbeat - Date.now() - 100);
   assert.strictEqual(A.played(), aBefore, 'A waits for the downbeat');
@@ -248,6 +255,7 @@ async function main() {
   await sleep(200);
   assert.ok(A.played().endsWith('G4  C4'), 'A starts on the downbeat');
   assert.ok(B.played().endsWith('F3'), 'B starts on the same downbeat');
+  assert.strictEqual(A.d.getElementById('count').textContent, '', 'the count-in clears on the downbeat');
   await sleep(600);
   assert.ok(A.played().endsWith('C4  D4  E4'));
   assert.ok(B.played().endsWith('F3  G3  A3'));
