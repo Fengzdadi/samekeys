@@ -79,59 +79,144 @@
   .played .held b { font-weight: 500; }
 
   /* fallboard: lacquer, felt, nameplate */
+  /* Materials. Every instrument draws from these tokens; the piano is the default. Only colours,
+     faces and decoration change between instruments: key buttons keep the same boxes, so a click
+     that lands on C4 lands on C4 whatever is playing. */
+  .stage {
+    --band: linear-gradient(#2A2620, #14110E 45%, #0F0D0A);
+    --band-pad: 0px;
+    --band-line: var(--felt);
+    --plate: var(--brass-light); --plate-font: var(--serif); --plate-size: 21px; --plate-spacing: .08em; --plate-case: none;
+    --plate-shadow: 0 1px 0 rgba(0,0,0,.6);
+    --status-color: rgba(214,183,111,.7);
+    --well: var(--lacquer);           /* between and below the keys */
+    --slip: none;                     /* the strip under the keys */
+    --slip-mask: none; --slip-clip: none;
+    --natural: linear-gradient(#FCF9F2, #F4EEE1 65%, #E7DFCE);
+    --natural-inset: 0px; --natural-radius: 0 0 4px 4px;
+    --natural-shadow: 0 4px 0 var(--ivory-edge), 0 7px 10px rgba(30,20,5,.22);
+    --natural-shadow-on: 0 1px 0 var(--ivory-edge), 0 2px 3px rgba(30,20,5,.18);
+    --natural-label: rgba(43,40,35,.75);
+    --natural-press: var(--brass-deep); --natural-press-min: .9; --natural-label-on: var(--ivory);
+    --sharp: linear-gradient(#3C3834, #1F1C1A 28%, #131110);
+    --sharp-inset: 0px; --sharp-radius: 0 0 3px 3px;
+    --sharp-shadow: 0 4px 0 #0A0908, 0 8px 10px rgba(0,0,0,.4);
+    --sharp-shadow-on: 0 1px 0 #0A0908, 0 3px 4px rgba(0,0,0,.35);
+    --sharp-label: rgba(255,255,255,.6); --sharp-label-bottom: 8px;
+    --sharp-press: var(--brass-light); --sharp-press-min: .8; --sharp-label-on: var(--ink);
+  }
+  /* Electric piano: black tolex, a brushed aluminium name rail, square plastic keys. */
+  .stage[data-instrument="epiano"] {
+    --band: repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 1px, rgba(0,0,0,.03) 1px 3px) 0 16px / 100% 100% no-repeat,
+            linear-gradient(#D3D6D8, #B4B8BB 45%, #9DA1A5) 0 16px / 100% 100% no-repeat,
+            linear-gradient(#1D1D1D, #111);
+    --band-pad: 16px;
+    --plate: #161616; --plate-font: var(--sans); --plate-size: 13px; --plate-spacing: .32em; --plate-case: uppercase;
+    --plate-shadow: 0 1px 0 rgba(255,255,255,.35);
+    --status-color: var(--ink);
+    --well: #0E0E0E;
+    --slip: linear-gradient(#1A1A1A, #0B0B0B);
+    --natural: linear-gradient(#F6F4EF, #F1EFE9 80%, #E4E1DA);
+    --natural-radius: 0;
+    --natural-shadow: 0 3px 0 #C4C0B6, 0 5px 6px rgba(0,0,0,.35);
+    --natural-shadow-on: 0 1px 0 #C4C0B6, 0 2px 3px rgba(0,0,0,.3);
+    --sharp: linear-gradient(#1C1C1C, #141414);
+    --sharp-radius: 0;
+    --sharp-shadow: 0 3px 0 #050505, 0 6px 8px rgba(0,0,0,.45);
+  }
+  /* Marimba: rosewood bars in two rows over a dark frame, resonators hanging below, longest in the bass.
+     A bar is drawn inside its button: bars narrow and shorten up the range (--g runs 0..1 from C2 to C7),
+     and the naturals sit below the row of accidentals, so no bar is drawn under another key's button. */
+  .stage[data-instrument="marimba"] {
+    --band: linear-gradient(#2E241F, #1B1512);
+    --band-line: #0E0B09;
+    --plate: var(--ivory);
+    --status-color: rgba(247,242,231,.75);
+    --well: #16110F;
+    --slip: linear-gradient(90deg, rgba(0,0,0,.4) 27%, rgba(255,255,255,.3) 45%, rgba(0,0,0,.4) 73%) 0 0 / calc(100% / 36) 100% repeat-x,
+            linear-gradient(#9A8458, #6F5C3A);
+    --slip-mask: linear-gradient(90deg, transparent 27%, #000 0 73%, transparent 0) 0 0 / calc(100% / 36) 100% repeat-x;
+    --slip-clip: polygon(0 0, 100% 0, 100% 45%, 0 100%);   /* one pipe per bar, shortening up the range */
+    --natural: linear-gradient(90deg, rgba(0,0,0,.06), rgba(255,255,255,.05) 40%, rgba(0,0,0,.08)), linear-gradient(#93583F, #86503C 60%, #7A4735);
+    --natural-radius: 4px;
+    --natural-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 3px 0 #0B0807;
+    --natural-shadow-on: inset 0 1px 0 rgba(255,255,255,.22), 0 1px 0 #0B0807;
+    --natural-label: var(--ivory);
+    --natural-press: var(--brass-light); --natural-label-on: var(--ink);
+    --sharp: linear-gradient(90deg, rgba(0,0,0,.06), rgba(255,255,255,.05) 40%, rgba(0,0,0,.08)), linear-gradient(#8A5039, #7B4636 60%, #6E3F30);
+    --sharp-radius: 4px;
+    --sharp-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 3px 0 #0B0807;
+    --sharp-shadow-on: inset 0 1px 0 rgba(255,255,255,.2), 0 1px 0 #0B0807;
+    --sharp-label: var(--ivory);
+    --sharp-press-min: .9;
+  }
+  /* the taper uses each key's own --g, so it is declared on the keys */
+  .stage[data-instrument="marimba"] .key.white { --face-inset: calc(64% + var(--g) * 10%) calc(2px + var(--g) * 14%) 2px; }
+  .stage[data-instrument="marimba"] .key.black {
+    --face-inset: 2px calc(1px + var(--g) * 12%) calc(36% + var(--g) * 20%);
+    --sharp-label-bottom: calc(36% + var(--g) * 20% + 6px);
+  }
+
+  /* fallboard: lacquer, felt, nameplate */
   .fallboard {
-    position: relative; height: 58px; flex-shrink: 0;
-    background: linear-gradient(#2A2620, #14110E 45%, #0F0D0A);
-    border-bottom: 3px solid var(--felt);
+    position: relative; height: 58px; flex-shrink: 0; padding-top: var(--band-pad);
+    background: var(--band);
+    border-bottom: 3px solid var(--band-line);
     display: flex; align-items: center; justify-content: center;
   }
   .nameplate {
-    font-family: var(--serif); font-weight: 500; font-size: 21px; letter-spacing: .08em;
-    color: var(--brass-light); text-shadow: 0 1px 0 rgba(0,0,0,.6);
+    font-family: var(--plate-font); font-weight: 500; font-size: var(--plate-size); letter-spacing: var(--plate-spacing);
+    text-transform: var(--plate-case); color: var(--plate); text-shadow: var(--plate-shadow);
   }
-  .status { position: absolute; right: 28px; font-size: 12px; color: rgba(214,183,111,.7); }
+  .status { position: absolute; right: 28px; font-size: 12px; color: var(--status-color); }
 
-  /* keys */
-  .keys-wrap { flex-shrink: 0; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; background: var(--lacquer); }
+  /* keys: each button is only a hit box. Its face (::before), press overlay (::after) and label are
+     drawn inside it from the material tokens above. */
+  .keys-wrap {
+    flex-shrink: 0; overflow-x: auto; overflow-y: hidden; touch-action: pan-x;
+    padding-bottom: 16px; background: var(--well);
+  }
   .keys {
     position: relative; display: flex; height: clamp(170px, 30vh, 290px); min-width: 760px;
     padding: 0 6px 12px; user-select: none; -webkit-user-select: none;
   }
+  .keys::after {   /* the strip under the keys: a key slip, or the marimba's resonators */
+    content: ""; position: absolute; left: 6px; right: 6px; bottom: -16px; height: 24px; pointer-events: none;
+    background: var(--slip); -webkit-mask: var(--slip-mask); mask: var(--slip-mask); clip-path: var(--slip-clip);
+  }
   .key {
-    border: 0; padding: 0; margin: 0; cursor: pointer; font: inherit;
+    border: 0; padding: 0; margin: 0; cursor: pointer; font: inherit; background: none;
     position: relative; -webkit-tap-highlight-color: transparent;
-    transition: transform .06s, box-shadow .06s;
+    transition: transform .06s;
   }
-  .key::after {
-    content: ""; position: absolute; inset: 0; border-radius: inherit;
-    opacity: 0; transition: opacity .05s; pointer-events: none;
+  .key::before, .key::after {
+    content: ""; position: absolute; pointer-events: none;
+    inset: var(--face-inset); border-radius: var(--face-radius);
   }
+  .key::before { background: var(--face); box-shadow: var(--face-shadow); transition: box-shadow .06s; }
+  .key::after { background: var(--press); opacity: 0; transition: opacity .05s; }
+  .key.on { transform: translateY(3px); }
+  /* pressed keys turn brass and flip their label, so the letter stays readable (4.5:1 or better) */
+  .key.on::before { box-shadow: var(--face-shadow-on); }
+  .key.on::after { opacity: calc(var(--press-min) + (1 - var(--press-min)) * var(--v, .7)); }
   .key.white {
     flex: 1 0 0; margin: 0 1px;
-    background: linear-gradient(#FCF9F2, #F4EEE1 65%, #E7DFCE);
-    border-radius: 0 0 4px 4px;
-    box-shadow: 0 4px 0 var(--ivory-edge), 0 7px 10px rgba(30,20,5,.22);
+    --face: var(--natural); --face-inset: var(--natural-inset); --face-radius: var(--natural-radius);
+    --face-shadow: var(--natural-shadow); --face-shadow-on: var(--natural-shadow-on);
+    --press: var(--natural-press); --press-min: var(--natural-press-min); --label-on: var(--natural-label-on);
   }
-  .key.white.on { transform: translateY(3px); box-shadow: 0 1px 0 var(--ivory-edge), 0 2px 3px rgba(30,20,5,.18); }
-  /* pressed keys turn brass and flip their label, so the letter stays readable (4.5:1 or better) */
-  .key.white::after { background: var(--brass-deep); }
-  .key.white.on::after { opacity: calc(.9 + .1 * var(--v, .7)); }
-  .key.white.on .lab { color: var(--ivory); }
   .key.black {
     position: absolute; top: 0; height: 62%; z-index: 2;
-    background: linear-gradient(#3C3834, #1F1C1A 28%, #131110);
-    border-radius: 0 0 3px 3px;
-    box-shadow: 0 4px 0 #0A0908, 0 8px 10px rgba(0,0,0,.4);
+    --face: var(--sharp); --face-inset: var(--sharp-inset); --face-radius: var(--sharp-radius);
+    --face-shadow: var(--sharp-shadow); --face-shadow-on: var(--sharp-shadow-on);
+    --press: var(--sharp-press); --press-min: var(--sharp-press-min); --label-on: var(--sharp-label-on);
   }
-  .key.black.on { transform: translateY(3px); box-shadow: 0 1px 0 #0A0908, 0 3px 4px rgba(0,0,0,.35); }
-  .key.black::after { background: var(--brass-light); }
-  .key.black.on::after { opacity: calc(.8 + .2 * var(--v, .7)); }
-  .key.black.on .lab { color: var(--ink); }
   .lab {
     position: absolute; left: 0; right: 0; bottom: 10px; z-index: 1; text-align: center;
-    font-size: 11px; color: rgba(43,40,35,.75); opacity: 0; transition: opacity .15s; pointer-events: none;
+    font-size: 11px; color: var(--natural-label); opacity: 0; transition: opacity .15s; pointer-events: none;
   }
-  .key.black .lab { bottom: 8px; font-size: 10px; color: rgba(255,255,255,.6); }
+  .key.black .lab { bottom: var(--sharp-label-bottom); font-size: 10px; color: var(--sharp-label); }
+  .key.on .lab { color: var(--label-on); }
   body.labels .lab { opacity: 1; }
 
   /* gate: the lid is closed until the person opens it */
@@ -159,7 +244,7 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .trace { display: none; }
-    .key, .key::after, .gate, .lab { transition: none; }
+    .key, .key::before, .key::after, .gate, .lab { transition: none; }
   }
 </style>
 </head>
@@ -199,7 +284,7 @@
 </div>
 
 <div class="keys-wrap">
-  <div class="keys" id="keys"></div>
+  <div class="keys" id="keys" role="group" aria-label="Piano keys"></div>
 </div>
 
 <div class="gate" id="gate">
@@ -250,6 +335,7 @@
     b.type = 'button';
     b.className = 'key ' + cls;
     b.dataset.midi = m;
+    b.style.setProperty('--g', ((m - LOW) / (HIGH - LOW)).toFixed(3));   // 0 at C2, 1 at C7: bars taper by it
     b.tabIndex = -1;
     const ch = midiToChar.get(m) || '';
     b.setAttribute('aria-label', noteName(m) + (ch ? ' (' + ch + ')' : ''));
@@ -861,11 +947,18 @@
 
   /* ---------- controls ---------- */
   const instrumentBtn = document.getElementById('instrument');
+  // The nameplate, the keyboard's group label and the materials all follow the instrument.
+  function showInstrument() {
+    document.getElementById('nameplate').textContent = instrument.name;
+    document.querySelector('.stage').dataset.instrument = instrument.id;
+    keysEl.setAttribute('aria-label', instrument.name + ' keys');
+  }
+  showInstrument();
   instrumentBtn.addEventListener('click', () => {
     instrument = INSTRUMENTS[(INSTRUMENTS.indexOf(instrument) + 1) % INSTRUMENTS.length];
     instrumentBtn.textContent = instrument.name;
     instrumentBtn.setAttribute('aria-label', 'Instrument: ' + instrument.name);
-    document.getElementById('nameplate').textContent = instrument.name;
+    showInstrument();
     instrumentBtn.blur();
     send('here');
   });

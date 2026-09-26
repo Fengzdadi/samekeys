@@ -167,6 +167,7 @@ async function main() {
     inst.click();
     assert.strictEqual(inst.getAttribute('aria-label'), 'Instrument: ' + name);
     assert.strictEqual(d.getElementById('nameplate').textContent, name, name + ' is on the nameplate');
+    assert.strictEqual(d.getElementById('keys').getAttribute('aria-label'), name + ' keys', 'the keyboard group names the instrument');
     key('keydown', 'u'); await sleep(30);
     assert.ok(lit(64), name + ' plays');
     key('keyup', 'u'); await sleep(150);
@@ -174,8 +175,10 @@ async function main() {
     await typeString('[tu]o'); await sleep(700);
     assert.ok(played().endsWith('[C4 E4]  G4'), name + ' plays a typed chord');
   }
+  assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'musicbox', 'the materials follow the instrument');
   inst.click();
   assert.strictEqual(inst.textContent, 'Piano', 'instrument cycles back');
+  assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'piano');
   assert.strictEqual(d.getElementById('status').textContent, '', 'alone: no ensemble status');
 
   // --- offline: synth fallback ---
