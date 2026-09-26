@@ -287,7 +287,7 @@ async function main() {
   assert.strictEqual(A.status(), '', 'a closed tab leaves');
   assert.ok(A.d.getElementById('together-how').hidden);
   // Alone again: typed phrases play right away and Enter does nothing.
-  await typeIn(A, 'tyu'); await sleep(40);
+  await typeIn(A, 'tyu'); await sleep(120);   // well before D4 is due (250 ms), with room for a busy machine
   assert.ok(A.played().endsWith('C4'), 'alone, a typed phrase starts at once');
 
   console.log('ok');
