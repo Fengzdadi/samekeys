@@ -18,6 +18,7 @@
     --felt: #7D2F36;
     --brass: #B08A44;
     --brass-light: #D6B76F;
+    --brass-deep: #765823;   /* pressed white keys: dark enough for an ivory label */
     --ink: #2B2823;
     --ink-2: #6E6960;
     --sans: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
@@ -73,7 +74,7 @@
     font-size: 14px; white-space: pre; overflow: hidden; text-overflow: ellipsis;
     font-variant-numeric: tabular-nums; letter-spacing: .02em;
   }
-  .played .queue { color: rgba(43,40,35,.32); }
+  .played .queue { color: rgba(43,40,35,.72); }
   .played .held { color: var(--ink); }
   .played .held b { font-weight: 500; }
 
@@ -103,7 +104,7 @@
   }
   .key::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
-    background: var(--brass); opacity: 0; transition: opacity .05s; pointer-events: none;
+    opacity: 0; transition: opacity .05s; pointer-events: none;
   }
   .key.white {
     flex: 1 0 0; margin: 0 1px;
@@ -112,7 +113,10 @@
     box-shadow: 0 4px 0 var(--ivory-edge), 0 7px 10px rgba(30,20,5,.22);
   }
   .key.white.on { transform: translateY(3px); box-shadow: 0 1px 0 var(--ivory-edge), 0 2px 3px rgba(30,20,5,.18); }
-  .key.white.on::after { opacity: calc(.32 + .45 * var(--v, .7)); }
+  /* pressed keys turn brass and flip their label, so the letter stays readable (4.5:1 or better) */
+  .key.white::after { background: var(--brass-deep); }
+  .key.white.on::after { opacity: calc(.9 + .1 * var(--v, .7)); }
+  .key.white.on .lab { color: var(--ivory); }
   .key.black {
     position: absolute; top: 0; height: 62%; z-index: 2;
     background: linear-gradient(#3C3834, #1F1C1A 28%, #131110);
@@ -120,10 +124,12 @@
     box-shadow: 0 4px 0 #0A0908, 0 8px 10px rgba(0,0,0,.4);
   }
   .key.black.on { transform: translateY(3px); box-shadow: 0 1px 0 #0A0908, 0 3px 4px rgba(0,0,0,.35); }
-  .key.black.on::after { opacity: calc(.5 + .4 * var(--v, .7)); }
+  .key.black::after { background: var(--brass-light); }
+  .key.black.on::after { opacity: calc(.8 + .2 * var(--v, .7)); }
+  .key.black.on .lab { color: var(--ink); }
   .lab {
-    position: absolute; left: 0; right: 0; bottom: 10px; text-align: center;
-    font-size: 11px; color: rgba(43,40,35,.5); opacity: 0; transition: opacity .15s; pointer-events: none;
+    position: absolute; left: 0; right: 0; bottom: 10px; z-index: 1; text-align: center;
+    font-size: 11px; color: rgba(43,40,35,.75); opacity: 0; transition: opacity .15s; pointer-events: none;
   }
   .key.black .lab { bottom: 8px; font-size: 10px; color: rgba(255,255,255,.6); }
   body.labels .lab { opacity: 1; }
