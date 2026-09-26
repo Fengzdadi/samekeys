@@ -96,7 +96,7 @@
     --natural-inset: 0px; --natural-radius: 0 0 4px 4px;
     --natural-shadow: 0 4px 0 var(--ivory-edge), 0 7px 10px rgba(30,20,5,.22);
     --natural-shadow-on: 0 1px 0 var(--ivory-edge), 0 2px 3px rgba(30,20,5,.18);
-    --natural-label: rgba(43,40,35,.75);
+    --natural-label: rgba(43,40,35,.75); --natural-label-bottom: 10px;
     --natural-press: var(--brass-deep); --natural-press-min: .9; --natural-label-on: var(--ivory);
     --sharp: linear-gradient(#3C3834, #1F1C1A 28%, #131110);
     --sharp-inset: 0px; --sharp-radius: 0 0 3px 3px;
@@ -156,6 +156,63 @@
     --face-inset: 2px calc(1px + var(--g) * 12%) calc(36% + var(--g) * 20%);
     --sharp-label-bottom: calc(36% + var(--g) * 20% + 6px);
   }
+  /* Organ: a cherry cabinet with a row of drawbars (a picture of the registration the sound uses, not
+     a control), flat-fronted waterfall keys. */
+  .stage[data-instrument="organ"] {
+    --band: repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 9px, rgba(255,255,255,.03) 9px 11px, transparent 11px 17px),
+            linear-gradient(#8A3F2A, #7A3423 50%, #5E2619);
+    --band-line: #3A160E;
+    --status-color: rgba(247,242,231,.8);
+    --drawbars: flex;
+    --well: #1B0F0B;
+    --slip: linear-gradient(#7A3423, #4E1F14);
+    --natural: linear-gradient(#F8F7F3, #F1EFE9);
+    --natural-radius: 0;
+    --natural-shadow: 0 2px 0 #CFCBC2, 0 4px 5px rgba(0,0,0,.35);
+    --natural-shadow-on: 0 1px 0 #CFCBC2, 0 1px 2px rgba(0,0,0,.3);
+    --sharp: linear-gradient(#262626, #121212);
+    --sharp-radius: 0 0 1px 1px;
+    --sharp-shadow: 0 2px 0 #050505, 0 5px 6px rgba(0,0,0,.45);
+  }
+  /* Music box: one chromatic comb. Steel teeth hang from the comb bar under a pinned brass cylinder,
+     naturals and blued sharps interleaved, shortening up the range; a crank turns the cylinder. The
+     natural teeth are narrow enough to stay clear of the sharps' buttons. */
+  .stage[data-instrument="musicbox"] {
+    --band: radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 0 3px / 23px 11px,
+            radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 9px 8px / 31px 13px,
+            linear-gradient(#7E6536, #C9AE6E 30%, #E2CB8E 45%, #B89A5A 70%, #6F5731);
+    --band-line: #9AA0A6;
+    --plate: var(--ink); --plate-shadow: 0 1px 0 rgba(255,255,255,.35);
+    --status-color: var(--ink);
+    --crank: block;
+    --well: linear-gradient(#4A2C1E, #3C2317);
+    --slip: linear-gradient(#3F2519, #2C190F);
+    --natural: linear-gradient(90deg, #A9AFB5, #E3E6E9 40%, #C9CDD1 60%, #A3A9AF);
+    --natural-radius: 0 0 3px 3px;
+    --natural-shadow: 0 2px 0 rgba(0,0,0,.35);
+    --natural-shadow-on: 0 1px 0 rgba(0,0,0,.3);
+    --natural-label: var(--ink);
+    --sharp: linear-gradient(90deg, #4E565F, #7A838C 45%, #5E6670 60%, #4A525A);
+    --sharp-radius: 0 0 3px 3px;
+    --sharp-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 2px 0 rgba(0,0,0,.35);
+    --sharp-shadow-on: inset 0 0 0 1px rgba(255,255,255,.18), 0 1px 0 rgba(0,0,0,.3);
+    --sharp-label: #fff;
+    --sharp-press-min: 1;
+  }
+  .stage[data-instrument="musicbox"] .key.white {
+    --face-inset: 0 calc(29% + 1px) calc(var(--g) * 34%);
+    --natural-label-bottom: calc(var(--g) * 34% + 8px);
+  }
+  .stage[data-instrument="musicbox"] .key.black {
+    --face-inset: 0 14% calc(var(--g) * 30%);
+    --sharp-label-bottom: calc(var(--g) * 30% + 6px);
+  }
+  /* a natural tooth can be narrower than its letter, so the letter sits on a small steel tag at the tip */
+  .stage[data-instrument="musicbox"] .key.white .lab {
+    left: 50%; right: auto; transform: translateX(-50%); min-width: 11px; padding: 0 2px;
+    line-height: 14px; border-radius: 3px; background: #D5D9DC;
+  }
+  .stage[data-instrument="musicbox"] .key.white.on .lab { background: var(--natural-press); }
 
   /* fallboard: lacquer, felt, nameplate */
   .fallboard {
@@ -169,6 +226,22 @@
     text-transform: var(--plate-case); color: var(--plate); text-shadow: var(--plate-shadow);
   }
   .status { position: absolute; right: 28px; font-size: 12px; color: var(--status-color); }
+  .drawbars {
+    display: var(--drawbars, none); gap: 5px; align-items: flex-start;
+    position: absolute; left: 28px; top: 0; padding-top: 5px;
+    background: linear-gradient(#1A0C07, #1A0C07) 0 0 / 100% 5px no-repeat;
+  }
+  .drawbars i {
+    width: 8px; height: calc(4px + var(--pull) * 4px); background: var(--tip);
+    border: 1px solid rgba(247,242,231,.45); border-top: 0; border-radius: 0 0 2px 2px;
+  }
+  .crank {   /* axle on the cylinder, an arm, a wooden knob */
+    display: var(--crank, none); position: absolute; left: 22px; top: 8px; width: 14px; height: 14px;
+    border-radius: 50%; background: radial-gradient(#E5D3A0, #8C7240); box-shadow: 0 0 0 2px #5A4526;
+    transform: rotate(28deg); transform-origin: 7px 7px;
+  }
+  .crank::before { content: ""; position: absolute; left: 5px; top: 7px; width: 4px; height: 26px; background: linear-gradient(90deg, #6F5731, #C9AE6E, #6F5731); border-radius: 2px; }
+  .crank::after { content: ""; position: absolute; left: 1px; top: 26px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #8A5A3C, #4A2C1E); }
 
   /* keys: each button is only a hit box. Its face (::before), press overlay (::after) and label are
      drawn inside it from the material tokens above. */
@@ -212,7 +285,7 @@
     --press: var(--sharp-press); --press-min: var(--sharp-press-min); --label-on: var(--sharp-label-on);
   }
   .lab {
-    position: absolute; left: 0; right: 0; bottom: 10px; z-index: 1; text-align: center;
+    position: absolute; left: 0; right: 0; bottom: var(--natural-label-bottom); z-index: 1; text-align: center;
     font-size: 11px; color: var(--natural-label); opacity: 0; transition: opacity .15s; pointer-events: none;
   }
   .key.black .lab { bottom: var(--sharp-label-bottom); font-size: 10px; color: var(--sharp-label); }
@@ -279,6 +352,8 @@
 </div>
 
 <div class="fallboard">
+  <span class="drawbars" id="drawbars" aria-hidden="true"></span>
+  <span class="crank" aria-hidden="true"></span>
   <span class="nameplate" id="nameplate">Piano</span>
   <span class="status" id="status"></span>
 </div>
@@ -539,6 +614,14 @@
   const ORGAN_GAIN = 0.26, ORGAN_SUB = 0.5, ORGAN_PERC = 0.35, ORGAN_VIBRATO = 0.004, ORGAN_RELEASE = 0.03;
   const DRAWBARS = [0, 1, 0.55, 0.5, 0.35, 0, 0.2, 0, 0.12];   // harmonics 1..8
   let organWave = null;
+  // The organ's picture of its drawbars comes from the same numbers: 16' 5 1/3' 8' 4' 2 2/3' 2' 1 3/5' 1 1/3' 1'.
+  [[ORGAN_SUB, '#6B4A2E'], [0, '#6B4A2E'], [DRAWBARS[1], '#F2EEE4'], [DRAWBARS[2], '#F2EEE4'], [DRAWBARS[3], '#1A1A1A'],
+   [DRAWBARS[4], '#F2EEE4'], [DRAWBARS[5], '#1A1A1A'], [DRAWBARS[6], '#1A1A1A'], [DRAWBARS[8], '#F2EEE4']].forEach(([amp, tip]) => {
+    const bar = document.createElement('i');
+    bar.style.setProperty('--pull', Math.round(amp * 8));
+    bar.style.setProperty('--tip', tip);
+    document.getElementById('drawbars').appendChild(bar);
+  });
   function organ(m, vel, when) {
     const f = mtof(m);
     organWave = organWave || ctx.createPeriodicWave(new Float32Array(DRAWBARS.length), Float32Array.from(DRAWBARS));
