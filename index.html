@@ -56,7 +56,7 @@
     font: inherit; font-size: 11.5px; line-height: 17px; color: var(--ink);
     background: rgba(255,255,255,.45); border: 1px solid rgba(43,40,35,.28); border-bottom-width: 2px; border-radius: 4px;
   }
-  .controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-shrink: 0; }
   .controls button, .group button {
     font: inherit; font-size: 13px; color: var(--ink); white-space: nowrap;
     background: none; border: 1px solid transparent; border-radius: 999px;
@@ -85,6 +85,15 @@
     pointer-events: none;
   }
   .count.next { font-size: 20px; color: var(--ink-2); }
+  /* Guidance lives only in empty places and leaves as soon as they fill: the wall shows a phrase to try
+     until the first note sounds. Nothing is remembered, so a friend at the same computer, or an agent
+     using the same browser, sees it too. */
+  .hint {   /* where the first played notes will appear */
+    position: absolute; left: 28px; right: 28px; bottom: 16px; margin: 0;
+    font-size: 16px; color: var(--ink-2); pointer-events: none;
+  }
+  .hint kbd { font-size: 13px; line-height: 20px; min-width: 22px; }
+  .stage[data-mode="stage"] .hint { display: none; }
   .traces { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
   .trace {
     position: absolute; bottom: 0; width: 2px; border-radius: 1px;
@@ -411,6 +420,7 @@
     .top { flex-direction: column; }
     .controls { margin-left: -11px; }
     .played { left: 16px; right: 16px; font-size: 17px; }
+    .hint { left: 16px; right: 16px; }
     .status { left: 16px; right: 16px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -461,6 +471,7 @@
   <div class="traces" id="traces" aria-hidden="true"></div>
   <p class="status" id="status" role="status"></p>
   <p class="count" id="count" aria-hidden="true"></p>
+  <p class="hint" id="hint">Press <kbd>t</kbd> <kbd>t</kbd> <kbd>o</kbd> <kbd>o</kbd> <kbd>p</kbd> <kbd>p</kbd> <kbd>o</kbd> to play Twinkle Twinkle, or click the keys.</p>
   <div class="strips" id="strips" role="group" aria-label="Players"></div>
   <p class="played"><span id="played" role="log" aria-live="polite" aria-label="Played notes"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
 </div>
@@ -915,7 +926,13 @@
       playedEl.textContent = groups.map(groupText).join('  ');
     }
   }
+  const hintEl = document.getElementById('hint');
+  // Keycaps are elements inside a sentence, and some agent tools that read the accessibility tree drop
+  // the text of such elements ("hold to sustain"). Each legend item and the hint carries its whole
+  // sentence as its name too, taken from its own text so the two never drift apart.
+  for (const el of document.querySelectorAll('.how i, #hint')) el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
   function logNote(m, when) {
+    hintEl.hidden = true;   // the wall's empty state goes with the first note
     const last = groups[groups.length - 1];
     if (last && Math.abs(last.t - when) < 0.012) { last.midis.push(m); last.midis.sort((x, y) => x - y); }
     else groups.push({ t: when, midis: [m] });
@@ -1293,12 +1310,14 @@
     const countLine = countText === 'next' ? 'Starting on the next bar' : countText && 'Count-in ' + countText;
     countEl.textContent = countLine && (countText === 'next' ? countLine : countText);
     countEl.classList.toggle('next', countText === 'next');
+    if (countText) hintEl.hidden = true;
     const parts = [countLine, fallbackNote].filter(Boolean);
     const others = players().map(([, p]) => p);
     if (stageMode) {
       const n = others.length;
       parts.push(`Stage · ${n} player${n === 1 ? '' : 's'} · Enter starts everyone, Esc stops`);
     } else if (stageOpen()) parts.push('Stage is open: sound comes from the stage');
+    else if (channel && !others.length) parts.push('Alone here · open this page in another tab to play together');
     if (others.length && !stageMode) {
       const line = document.createDocumentFragment();
       line.append(others.length === 1 ? 'Other tab: ' : 'Other tabs: ');
@@ -1543,6 +1562,7 @@
       renderStatus();
     };
     send('hello');
+    renderStatus();
     setInterval(() => {
       for (const [id, p] of peers) if (Date.now() - p.seen > 75000) peers.delete(id);   // background tabs tick slowly
       renderStatus();

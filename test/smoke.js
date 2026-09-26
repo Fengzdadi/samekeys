@@ -124,14 +124,22 @@ async function main() {
   assert.ok(main.includes('middle C') && main.includes('Open the piano') && main.includes('Sustain') && main.includes('Harpsichord'),
     'main holds the whole instrument, so tools that read "main" see the instructions, controls and lid');
   assert.ok(main.includes('1–0 q–p a–l z–m are the natural keys'), 'the key legend reads as a sentence');
+  for (const el of d.querySelectorAll('.how i, #hint'))
+    assert.strictEqual(el.getAttribute('aria-label'), el.textContent.replace(/\s+/g, ' ').trim(), 'keycap sentences carry their whole text as a name');
+  const hint = d.getElementById('hint');
+  assert.ok(!hint.hidden && hint.textContent.includes('Press t t o o p p o to play Twinkle Twinkle'),
+    'the empty wall offers a tune to try, as keys to press, read the same as text');
   d.getElementById('open').click();
   await sleep(200);
   assert.ok(d.getElementById('gate').classList.contains('hide'), 'gate hides after opening');
-  assert.strictEqual(d.getElementById('status').textContent, '', 'no fallback message when samples load');
+  assert.strictEqual(d.getElementById('status').textContent, 'Alone here · open this page in another tab to play together',
+    'alone, the ensemble line says how to play together, and no fallback message when samples load');
+  assert.ok(!hint.hidden, 'the phrase to try stays until something is played');
 
   // human: press and hold is immediate, release follows keyup
   key('keydown', 't'); await sleep(30);
   assert.ok(lit(60), 'immediate note lights the key');
+  assert.ok(hint.hidden, 'the first note clears the phrase to try');
   assert.strictEqual(played(), 'C4');
   key('keyup', 't'); await sleep(150);
   assert.ok(!lit(60), 'key releases after keyup');
@@ -253,7 +261,7 @@ async function main() {
   pick(d, 'Piano');
   assert.strictEqual(picked(d), 'Piano', 'back to the piano');
   assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'piano');
-  assert.strictEqual(d.getElementById('status').textContent, '', 'alone: no ensemble status');
+  assert.strictEqual(d.getElementById('status').textContent, 'Alone here · open this page in another tab to play together', 'alone: the ensemble line\'s empty state');
 
   // The agent prompt: an ensemble in one paste. It is the README's text, it names what is really on the
   // page, and every part in it plays the notes it should.
@@ -282,6 +290,15 @@ async function main() {
   pick(d, 'Piano');
   await sleep(2500);
   assert.strictEqual(promptBtn.textContent, 'Copy agent prompt', 'and goes back to its name');
+
+  // the wall's hint names a tune; pressed at a person's pace, its keys play that tune
+  {
+    const w2 = load({ room: 'twinkle' }), d2 = w2.document;
+    const press = (type, k) => d2.dispatchEvent(new w2.KeyboardEvent(type, { key: k, code: codeFor(k), bubbles: true, cancelable: true }));
+    d2.getElementById('open').click(); await sleep(200);
+    for (const ch of 'ttooppo') { press('keydown', ch); await sleep(150); press('keyup', ch); await sleep(150); }
+    assert.strictEqual(d2.getElementById('played').textContent, 'C4  C4  G4  G4  A4  A4  G4', 'the hint plays Twinkle Twinkle');
+  }
 
   // --- offline: synth fallback ---
   w = load({ offline: true }); d = w.document;
@@ -381,7 +398,7 @@ async function main() {
   assert.strictEqual(A.status(), 'Other tab: Electric piano');
 
   b.dispatchEvent(new b.Event('pagehide')); await sleep(50);
-  assert.strictEqual(A.status(), '', 'a closed tab leaves');
+  assert.strictEqual(A.status(), 'Alone here · open this page in another tab to play together', 'a closed tab leaves, and the empty state comes back');
   assert.ok(A.d.getElementById('together-how').hidden);
   // Alone again: typed phrases play right away and Enter does nothing.
   await typeIn(A, 'tyu'); await sleep(40);   // well before D4 is due (250 ms)
