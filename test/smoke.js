@@ -5,6 +5,8 @@ const path = require('path');
 const assert = require('assert');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+let clipboard = '';   // what the page last copied
 
 // One fake clock for every window. Page timers, performance.now(), Date.now(), the audio clock and the
 // messages between tabs all run on it, and the test moves it forward, so the results depend on the code
@@ -91,6 +93,7 @@ function load({ offline = false, room = 'solo' } = {}) {
       w.fetch = offline
         ? () => Promise.reject(new Error('offline'))
         : () => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
+      Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: async text => { clipboard = text; } } });
       w.HTMLElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 20, height: 100, right: 20, bottom: 100 });
     }
   });
@@ -250,6 +253,33 @@ async function main() {
   assert.strictEqual(picked(d), 'Piano', 'back to the piano');
   assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'piano');
   assert.strictEqual(d.getElementById('status').textContent, '', 'alone: no ensemble status');
+
+  // The agent prompt: an ensemble in one paste. It is the README's text, it names what is really on the
+  // page, and every part in it plays the notes it should.
+  const promptBtn = d.getElementById('agent-prompt');
+  promptBtn.click(); await sleep(0);
+  assert.ok(promptBtn.textContent.startsWith('Copied'), 'the button says it copied');
+  assert.ok(readme.includes(clipboard.replace('http://localhost/', 'https://fengzdadi.github.io/samekeys/')),
+    'the README carries the same prompt');
+  for (const words of ['Open the piano', 'Ready, waiting for Enter'])
+    assert.ok(clipboard.includes('"' + words + '"') && html.includes(words), 'the prompt quotes "' + words + '" as the page says it');
+  const parts = [
+    ['Organ', 'C3  F2  G2  C3'],
+    ['Harpsichord', '[C3 E3 G3]  [C3 E3 G3]  [C3 F3 A3]  [C3 F3 A3]  [B2 D3 G3]  [B2 D3 G3]  [C3 E3 G3]'],
+    ['Marimba', 'C4  E4  G4  E4  C4  F4  A4  F4  B3  D4  G4  D4  C4'],
+    ['Music box', 'E5  D5  C5  D5  F5  A5  G5  F5  E5  D5  C5'],
+    ['Piano', 'E4  D4  C4  D4  F4  A4  G4  F4  E4  D4  C4'],
+    ['Electric piano', '[C4 E4 G4]  [C4 E4 G4]  [C4 F4 A4]  [C4 F4 A4]  [B3 D4 G4]  [B3 D4 G4]  [C4 E4 G4]'],
+  ];
+  for (const [name, notes] of parts) {
+    const part = clipboard.match(new RegExp('\\b' + name + ': ([^\\s,)]+)'))[1];
+    pick(d, name);
+    await typeString(part); await sleep(4500);
+    assert.ok(played().endsWith(notes), name + '\'s part in the prompt plays ' + notes);
+  }
+  pick(d, 'Piano');
+  await sleep(2500);
+  assert.strictEqual(promptBtn.textContent, 'Copy agent prompt', 'and goes back to its name');
 
   // --- offline: synth fallback ---
   w = load({ offline: true }); d = w.document;

@@ -58,7 +58,7 @@
   }
   .controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .controls button, .group button {
-    font: inherit; font-size: 13px; color: var(--ink);
+    font: inherit; font-size: 13px; color: var(--ink); white-space: nowrap;
     background: none; border: 1px solid transparent; border-radius: 999px;
     padding: 5px 11px; cursor: pointer;
   }
@@ -412,6 +412,7 @@
     </span>
   </p>
   <div class="controls">
+    <button type="button" id="agent-prompt">Copy agent prompt</button>
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
     <button type="button" id="labels" aria-pressed="true">Labels</button>
     <div class="group" role="group" aria-label="Tempo">
@@ -1133,6 +1134,60 @@
     instrumentsEl.appendChild(b);
   });
   showInstrument();
+  // A prompt a person pastes to their own agent to play an ensemble: one tab per instrument, parts loaded
+  // one at a time, one Enter to start. Plain instructions for playing the page the way a person does; one
+  // agent can do it alone, or hand each instrument to a helper. Every example part fits the same C, F, G, C
+  // progression, so any mix of tabs sounds together. README.md carries the same text.
+  const EXAMPLE_PARTS = {
+    organ: '8---4---5---8---', harpsichord: '[80w]-[80w]-[8qe]-[8qe]-[79w]-[79w]-[80w]---',
+    marimba: 'tuoutipiryoyt---', musicbox: 'fdsdg-j-hgfds---',
+    piano: 'uytyi-p-oiuyt---', epiano: '[tuo]-[tuo]-[tip]-[tip]-[ryo]-[ryo]-[tuo]---',
+  };
+  function agentPrompt() {
+    const part = id => `${INSTRUMENTS.find(i => i.id === id).name}: ${EXAMPLE_PARTS[id]}`;
+    return [
+      'Please play an ensemble on a web instrument, using the browser the way a person would.',
+      'Each instrument plays in its own browser tab; the tabs find each other and start together.',
+      '',
+      `Page: ${location.origin + location.pathname}`,
+      'Parts (two bars of C, F, G, C; each character is one key press):',
+      ...['organ', 'harpsichord', 'marimba', 'musicbox'].map(id => '- ' + part(id)),
+      `(${part('piano')}, ${part('epiano')})`,
+      '',
+      '1. Open one tab per instrument and click "Open the piano" in each. Open them all before playing: a tab that is alone plays at once instead of waiting.',
+      '2. In each tab, click the instrument\'s name on the dark band above the keys, then press its part\'s keys in one quick burst. The part waits: the line above the keys says "Ready, waiting for Enter".',
+      '3. When every tab shows its part ready, press Enter in any one tab. All tabs count in and start together on the next bar. Esc in any tab stops everything.',
+      '',
+      'You can do the tabs one after another yourself. If you can start helper agents, you may give each instrument its own, but they share one browser: let them load their parts one at a time, and have one of them (or you) press Enter at the end.',
+      '',
+      `Pressing keys: t is middle C, 1–0 q–p a–l z–m are the natural keys from C2 up, Shift plays a sharp, [ ] makes a chord, - holds. Press keys, don't type text: the page has no text box. With Claude in Chrome, send a part as one key action with the characters separated by spaces (e.g. "${[...EXAMPLE_PARTS.organ].join(' ')}"), using literal characters, not key names like "minus".`,
+      '',
+      'Only want one instrument? Play just its part in a single tab.',
+      'Tell me what each tab\'s line above the keys said.',
+    ].join('\n');
+  }
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* try the old way */ }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.cssText = 'position: fixed; opacity: 0';
+    document.body.appendChild(area);
+    area.select();
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch (e) { /* not supported */ }
+    area.remove();
+    return copied;
+  }
+  const promptBtn = document.getElementById('agent-prompt');
+  let promptTimer = 0;
+  promptBtn.addEventListener('click', async () => {
+    promptBtn.blur();
+    const copied = await copyText(agentPrompt());
+    promptBtn.textContent = copied ? 'Copied: paste it to your agent' : 'Couldn’t copy; see the README';
+    clearTimeout(promptTimer);
+    promptTimer = setTimeout(() => { promptBtn.textContent = 'Copy agent prompt'; }, 2500);
+  });
   const sustainBtn = document.getElementById('sustain');
   function updatePedalUI() { sustainBtn.setAttribute('aria-pressed', String(pedalOn())); }
   sustainBtn.addEventListener('click', () => {
