@@ -261,7 +261,8 @@ async function main() {
   assert.ok(promptBtn.textContent.startsWith('Copied'), 'the button says it copied');
   assert.ok(readme.includes(clipboard.replace('http://localhost/', 'https://fengzdadi.github.io/samekeys/')),
     'the README carries the same prompt');
-  for (const words of ['Open the piano', 'Ready, waiting for Enter'])
+  assert.strictEqual(d.getElementById('played').getAttribute('aria-label'), 'Played notes', 'the played line has a name tools can find');
+  for (const words of ['Open the piano', 'Ready, waiting for Enter', 'Played notes'])
     assert.ok(clipboard.includes('"' + words + '"') && html.includes(words), 'the prompt quotes "' + words + '" as the page says it');
   const parts = [
     ['Organ', 'C3  F2  G2  C3'],

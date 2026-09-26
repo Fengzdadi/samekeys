@@ -284,7 +284,6 @@
     font-family: var(--plate-font); font-weight: 500; font-size: var(--plate-dim-size); letter-spacing: var(--plate-spacing);
     text-transform: var(--plate-case); white-space: nowrap; color: var(--plate-dim); text-shadow: var(--plate-shadow);
   }
-  .instruments button:hover { text-decoration: underline dotted 1px; text-underline-offset: 5px; }   /* not to be mistaken for the chosen one */
   .instruments button[aria-pressed="true"] {
     font-size: var(--plate-size); color: var(--plate);
     text-decoration: underline 1px; text-underline-offset: 5px;
@@ -416,7 +415,7 @@
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
     <button type="button" id="labels" aria-pressed="true">Labels</button>
     <div class="group" role="group" aria-label="Tempo">
-      <span aria-hidden="true">♩ =</span>
+      <span aria-hidden="true">♩&nbsp;=</span>
       <output id="bpm">120</output>
       <button type="button" id="slower" aria-label="Slower">−</button>
       <button type="button" id="faster" aria-label="Faster">+</button>
@@ -428,7 +427,7 @@
   <div class="traces" id="traces" aria-hidden="true"></div>
   <p class="status" id="status" role="status"></p>
   <p class="count" id="count" aria-hidden="true"></p>
-  <p class="played"><span id="played" aria-live="polite"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
+  <p class="played"><span id="played" role="log" aria-live="polite" aria-label="Played notes"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
 </div>
 
 <div class="fallboard">
@@ -1155,6 +1154,7 @@
       `(${part('piano')}, ${part('epiano')})`,
       '',
       '1. Open one tab per instrument and click "Open the piano" in each. Open them all before playing: a tab that is alone plays at once instead of waiting.',
+      '   Work in one tab at a time: bring it to the front and check that the "Open the piano" screen is gone before you click or press keys there. Clicks and key presses sent to a tab that is not in front can be lost.',
       '2. In each tab, click the instrument\'s name on the dark band above the keys, then press its part\'s keys in one quick burst. The part waits: the line above the keys says "Ready, waiting for Enter".',
       '3. When every tab shows its part ready, press Enter in any one tab. All tabs count in and start together on the next bar. Esc in any tab stops everything.',
       '',
@@ -1163,7 +1163,7 @@
       `Pressing keys: t is middle C, 1–0 q–p a–l z–m are the natural keys from C2 up, Shift plays a sharp, [ ] makes a chord, - holds. Press keys, don't type text: the page has no text box. With Claude in Chrome, send a part as one key action with the characters separated by spaces (e.g. "${[...EXAMPLE_PARTS.organ].join(' ')}"), using literal characters, not key names like "minus".`,
       '',
       'Only want one instrument? Play just its part in a single tab.',
-      'Tell me what each tab\'s line above the keys said.',
+      'Tell me what each tab\'s "Played notes" line, just above the keys, said.',
     ].join('\n');
   }
   async function copyText(text) {

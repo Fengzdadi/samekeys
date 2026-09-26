@@ -33,6 +33,7 @@ Parts (two bars of C, F, G, C; each character is one key press):
 (Piano: uytyi-p-oiuyt---, Electric piano: [tuo]-[tuo]-[tip]-[tip]-[ryo]-[ryo]-[tuo]---)
 
 1. Open one tab per instrument and click "Open the piano" in each. Open them all before playing: a tab that is alone plays at once instead of waiting.
+   Work in one tab at a time: bring it to the front and check that the "Open the piano" screen is gone before you click or press keys there. Clicks and key presses sent to a tab that is not in front can be lost.
 2. In each tab, click the instrument's name on the dark band above the keys, then press its part's keys in one quick burst. The part waits: the line above the keys says "Ready, waiting for Enter".
 3. When every tab shows its part ready, press Enter in any one tab. All tabs count in and start together on the next bar. Esc in any tab stops everything.
 
@@ -41,7 +42,7 @@ You can do the tabs one after another yourself. If you can start helper agents, 
 Pressing keys: t is middle C, 1–0 q–p a–l z–m are the natural keys from C2 up, Shift plays a sharp, [ ] makes a chord, - holds. Press keys, don't type text: the page has no text box. With Claude in Chrome, send a part as one key action with the characters separated by spaces (e.g. "8 - - - 4 - - - 5 - - - 8 - - -"), using literal characters, not key names like "minus".
 
 Only want one instrument? Play just its part in a single tab.
-Tell me what each tab's line above the keys said.
+Tell me what each tab's "Played notes" line, just above the keys, said.
 ```
 
 ## Run it locally
