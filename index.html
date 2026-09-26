@@ -71,6 +71,8 @@
     font-variant-numeric: tabular-nums; letter-spacing: .02em;
   }
   .played .queue { color: rgba(43,40,35,.32); }
+  .played .held { color: var(--ink); }
+  .played .held b { font-weight: 500; }
 
   /* fallboard: lacquer, felt, nameplate */
   .fallboard {
@@ -156,8 +158,9 @@
 
 <header class="top">
   <p class="how">
-    <b>1–0 q–p a–l z–m</b> are the white keys from C2, <b>t</b> is middle C, <b>Shift</b> adds a sharp, <b>Space</b> sustains.<br>
-    Type fast to play in time: space is a rest, <b>[ ]</b> a chord, <b>-</b> a hold.
+    <b>1–0 q–p a–l z–m</b> are the white keys from C2, <b>t</b> is middle C, <b>Shift</b> adds a sharp, hold <b>Space</b> to sustain.<br>
+    Type fast (keys under 70 ms apart) to play in time: space is a rest, <b>[ ]</b> a chord, <b>-</b> a hold.
+    <span id="together-how" hidden><br>With another tab open, typed music waits and shows as “ready”: <b>Enter</b> counts everyone in, <b>Esc</b> stops everyone.</span>
   </p>
   <div class="controls">
     <div class="group">
@@ -177,7 +180,7 @@
 
 <main class="wall" id="wall">
   <div class="traces" id="traces" aria-hidden="true"></div>
-  <p class="played"><span id="played" aria-live="polite"></span><span id="queue" class="queue" aria-hidden="true"></span></p>
+  <p class="played"><span id="played" aria-live="polite"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
 </main>
 
 <div class="fallboard">
@@ -446,8 +449,14 @@
     for (const p of pendingRelease.values()) clearTimeout(p.timer);
     pendingRelease.clear();
     typing.active = false; typing.pending = [];
+    for (const o of clicks) o.stop();
+    clicks.length = 0;
+    countText = '';
+    const hadHeld = held.length > 0;
+    held.length = 0;
     for (const el of keyEls.values()) el.classList.remove('on');
-    renderQueue();
+    renderQueue(); renderStatus();
+    if (hadHeld) send('here');
   }
 
   /* ---------- visuals ---------- */
@@ -476,6 +485,7 @@
 
   const playedEl = document.getElementById('played');
   const queueEl = document.getElementById('queue');
+  const heldEl = document.getElementById('held');
   let groups = [];
   const groupText = g => g.midis.length > 1 ? '[' + g.midis.map(noteName).join(' ') + ']' : noteName(g.midis[0]);
   function renderPlayed() {
@@ -499,6 +509,12 @@
     const now = ctx ? ctx.currentTime : 0;
     typing.pending = typing.pending.filter(p => p.when > now);
     queueEl.textContent = typing.pending.length ? '   ' + typing.pending.map(p => p.ch).join('') : '';
+    heldEl.innerHTML = '';
+    if (held.length) {
+      const label = document.createElement('b');
+      label.textContent = '   Ready, waiting for Enter: ';
+      heldEl.append(label, held.join(''));
+    }
     renderPlayed();
     if (typing.pending.length && !queueTimer) queueTimer = setInterval(renderQueue, 80);
     if (!typing.pending.length && queueTimer) { clearInterval(queueTimer); queueTimer = 0; }
@@ -508,18 +524,21 @@
   let bpm = 120;
   const slotDur = () => 60 / bpm / 2;               // one character = one eighth note
   const barDur = () => 60 / bpm * 4;
-  const typing = { active: false, anchor: 0, slot: 0, chord: null, lastNotes: [], pending: [] };
+  const typing = { active: false, holding: false, anchor: 0, slot: 0, chord: null, lastNotes: [], pending: [] };
   function addPending(ch, when) { typing.pending.push({ ch, when }); renderQueue(); }
+  // With other tabs open, typed characters wait here until someone presses Enter.
+  const held = [];
+  function hold(ch) {
+    held.push(ch);
+    renderQueue();
+    if (held.length === 1) send('here');
+  }
 
   function typeToken(ch) {
     const sd = slotDur(), s = typing.slot;
     let at = typing.anchor + s * sd;
     // If the grid has fallen behind real time, move it 60 ms ahead so the rest of this slot (a chord being typed) lands together.
-    // With other tabs open, move it by whole eighths instead, so it stays on the shared grid.
-    if (at < ctx.currentTime + 0.005) {
-      const shift = (together() ? nextOnGrid(ctx.currentTime + 0.03, sd) : ctx.currentTime + 0.06) - at;
-      typing.anchor += shift; at += shift;
-    }
+    if (at < ctx.currentTime + 0.005) { const shift = ctx.currentTime + 0.06 - at; typing.anchor += shift; at += shift; }
     if (ch === '[') { if (!typing.chord) { typing.chord = []; addPending('[', at); } return; }
     if (ch === ']') {
       if (typing.chord) { typing.lastNotes = typing.chord; typing.chord = null; addPending(']', at); typing.slot = s + 1; }
@@ -547,26 +566,35 @@
     next = Math.min(200, Math.max(60, next));
     const oldSd = slotDur();
     bpm = next;
-    if (typing.active) {
-      const at = typing.anchor + typing.slot * oldSd;
-      // Keep the next slot where it was, or with other tabs open, move it to the nearest point on the new shared grid.
-      typing.anchor = (together() ? nextOnGrid(Math.max(at, ctx.currentTime + 0.03), slotDur()) : at) - typing.slot * slotDur();
-    }
+    if (typing.active) typing.anchor += typing.slot * (oldSd - slotDur());   // keep the next slot where it was
     document.getElementById('bpm').value = bpm;
     if (share) { tempoSettled = true; send('tempo'); }
   }
 
   /* ---------- computer keyboard ---------- */
-  const immediateHeld = new Map();   // e.code -> midi, keys currently down in immediate mode
-  const pendingRelease = new Map();  // e.code -> {midi, timer}: grace period so typed phrases keep their first note
+  const immediateHeld = new Map();   // keyId -> midi, keys currently down in immediate mode
+  const pendingRelease = new Map();  // keyId -> {midi, timer}: grace period so typed phrases keep their first note
   let lastDown = -1e9, lastDownAudio = 0, lastChar = null, lastCode = null;
+  // Some automation sends Shift as a flag on the unshifted key ("t" + shiftKey) where a keyboard sends "T",
+  // or leaves e.code empty. Both still count, so a sharp is a sharp however the key arrives.
+  function keyChar(e) {
+    const k = e.key === 'Spacebar' ? ' ' : e.key;
+    if (!e.shiftKey || k.length !== 1) return k;
+    return SHIFT_DIGITS[k] || k.toUpperCase();
+  }
+  const keyId = e => e.code || 'key:' + e.key.toLowerCase();
 
   function onKeyDown(e) {
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     if (['Shift', 'Meta', 'Control', 'Alt', 'CapsLock', 'Tab'].includes(e.key)) return;
     if (!ready) { if (!opening) openPiano(); return; }
-    if (e.key === 'Escape') { panic(); return; }
-    const ch = e.key === 'Spacebar' ? ' ' : e.key;
+    if (e.key === 'Escape') { panic(); if (together()) send('stop'); return; }
+    if (e.key === 'Enter') {
+      if (e.target.closest && e.target.closest('button')) return;   // Enter on a focused control presses it
+      if (together() || held.length) { e.preventDefault(); countIn(); }
+      return;
+    }
+    const ch = keyChar(e), id = keyId(e);
     if (ch.length !== 1) return;
     const mapped = charToMidi.has(ch) || ' []-|'.includes(ch);
     if (!mapped) return;
@@ -577,55 +605,58 @@
     if (!typing.active) {
       if (gap < TYPE_GAP && heldSet.size === 0 && lastChar !== null) {
         // The previous keystroke was the start of a typed phrase: make it slot 0.
-        // Alone, the phrase starts where that keystroke did. With other tabs open, it starts on the next shared bar.
+        // With other tabs open, the phrase is held for the count-in instead, and that first note taken back.
         typing.active = true;
-        typing.anchor = together() ? nextOnGrid(ctx.currentTime + 0.05, barDur()) : lastDownAudio;
-        typing.slot = 0; typing.chord = null; typing.lastNotes = []; typing.pending = [];
+        typing.holding = together();
+        typing.anchor = lastDownAudio;
+        typing.slot = 0; typing.chord = null; typing.lastNotes = [];
+        typing.pending = typing.pending.filter(p => p.when > ctx.currentTime);
         const prev = charToMidi.get(lastChar);
         if (prev != null) {
           const pr = pendingRelease.get(lastCode);
           if (pr) { clearTimeout(pr.timer); pendingRelease.delete(lastCode); }
           immediateHeld.delete(lastCode); heldSet.delete(prev);
-          if (together()) { takeBack(prev); typeToken(lastChar); }
-          else {
-            typing.lastNotes = [prev]; typing.slot = 1;
-            addPending(lastChar, typing.anchor);
-            scheduleOff(prev, typing.anchor + slotDur() - 0.01);
-          }
+        }
+        if (typing.holding) { if (prev != null) takeBack(prev); hold(lastChar); }
+        else if (prev != null) {
+          typing.lastNotes = [prev]; typing.slot = 1;
+          addPending(lastChar, typing.anchor);
+          scheduleOff(prev, typing.anchor + slotDur() - 0.01);
         } else if (lastChar === '[') { typing.chord = []; addPending('[', typing.anchor); }
         else if (lastChar === ' ' || lastChar === '-') { addPending(lastChar, typing.anchor); typing.slot = 1; }
       }
     } else if (!queueBusy && gap > TYPE_GAP * 4) {
       typing.active = false;
     }
-    lastDown = now; lastDownAudio = ctx.currentTime; lastChar = ch; lastCode = e.code;
+    lastDown = now; lastDownAudio = ctx.currentTime; lastChar = ch; lastCode = id;
 
-    if (typing.active) { typeToken(ch); return; }
+    if (typing.active) { if (typing.holding) hold(ch); else typeToken(ch); return; }
 
     if (ch === ' ') { pedalDown = true; updatePedalUI(); return; }
     const m = charToMidi.get(ch);
     if (m == null) return;
-    if (immediateHeld.has(e.code)) return;
-    const pr = pendingRelease.get(e.code);
-    if (pr) { clearTimeout(pr.timer); pendingRelease.delete(e.code); }
+    if (immediateHeld.has(id)) return;
+    const pr = pendingRelease.get(id);
+    if (pr) { clearTimeout(pr.timer); pendingRelease.delete(id); }
     noteOn(m, 0.72 + Math.random() * 0.06);
     heldSet.add(m);
-    immediateHeld.set(e.code, m);
+    immediateHeld.set(id, m);
   }
   function onKeyUp(e) {
     if (!ready) return;
-    if (e.code === 'Space') {
+    if (e.code === 'Space' || e.key === ' ') {
       e.preventDefault();
       pedalDown = false; updatePedalUI();
       if (!latch) releaseSustained();
       return;
     }
-    const m = immediateHeld.get(e.code);
+    const id = keyId(e);
+    const m = immediateHeld.get(id);
     if (m == null) return;
-    immediateHeld.delete(e.code);
+    immediateHeld.delete(id);
     heldSet.delete(m);
-    const timer = setTimeout(() => { pendingRelease.delete(e.code); noteOff(m); }, TYPE_GAP + 10);
-    pendingRelease.set(e.code, { midi: m, timer });
+    const timer = setTimeout(() => { pendingRelease.delete(id); noteOff(m); }, TYPE_GAP + 10);
+    pendingRelease.set(id, { midi: m, timer });
   }
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
@@ -691,6 +722,7 @@
     instrument = INSTRUMENTS[(INSTRUMENTS.indexOf(instrument) + 1) % INSTRUMENTS.length];
     instrumentBtn.textContent = instrument.name;
     instrumentBtn.setAttribute('aria-label', 'Instrument: ' + instrument.name);
+    document.getElementById('nameplate').textContent = instrument.name;
     instrumentBtn.blur();
     send('here');
   });
@@ -732,19 +764,27 @@
   }
   openBtn.addEventListener('click', openPiano);
 
-  /* ---------- other tabs: the same page open elsewhere on this computer plays in time with this one ---------- */
-  // Tabs find each other over BroadcastChannel, share the tempo, and start typed phrases on the same bar.
-  // Bars are counted from the wall clock, so every tab agrees on where they fall without a server.
+  /* ---------- other tabs: the same page open elsewhere on this computer plays together with this one ---------- */
+  // Tabs find each other over BroadcastChannel and share the tempo. Typed music waits in each tab until
+  // someone presses Enter; then every tab counts in one bar and starts on the same downbeat. Bars are
+  // counted from the wall clock, so the tabs agree on where they fall without a server.
   const me = Math.random().toString(36).slice(2);
-  const peers = new Map();   // id -> {instrument, seen}
+  const peers = new Map();   // id -> {instrument, ready, seen}
   const channel = 'BroadcastChannel' in window ? new BroadcastChannel('samekeys') : null;
   let tempoSettled = false;  // a new tab takes the tempo of the tabs already open
-  let fallbackNote = '';
+  let fallbackNote = '', countText = '';
+  const clicks = [];         // count-in clicks, so Esc can silence them
+  const togetherHow = document.getElementById('together-how');
   const together = () => peers.size > 0;
-  function send(type) { if (channel) channel.postMessage({ type, id: me, instrument: instrument.id, bpm }); }
+  function send(type, extra) {
+    if (channel) channel.postMessage({ type, id: me, instrument: instrument.id, bpm, ready: held.length > 0, ...extra });
+  }
   function renderStatus() {
-    const others = [...peers.values()].map(p => (INSTRUMENTS.find(i => i.id === p.instrument) || INSTRUMENTS[0]).name);
-    statusEl.textContent = [fallbackNote, others.length ? 'In time with ' + others.join(', ') : ''].filter(Boolean).join(' · ');
+    const others = [...peers.values()].map(p =>
+      (INSTRUMENTS.find(i => i.id === p.instrument) || INSTRUMENTS[0]).name + (p.ready ? ' (ready)' : ''));
+    const withText = others.length ? (others.length === 1 ? 'Other tab: ' : 'Other tabs: ') + others.join(', ') : '';
+    statusEl.textContent = [countText && 'Count-in ' + countText, fallbackNote, withText].filter(Boolean).join(' · ');
+    togetherHow.hidden = !together();
   }
   // Wall-clock seconds minus audio-clock seconds, measured at the speaker when the browser can tell.
   function wallOffset() {
@@ -752,18 +792,56 @@
     if (ts && ts.contextTime > 0) return (performance.timeOrigin + ts.performanceTime) / 1000 - ts.contextTime;
     return Date.now() / 1000 - ctx.currentTime;
   }
-  // The first point at or after audio time t on the shared grid of the given step (a bar, an eighth).
-  function nextOnGrid(t, step) {
-    const off = wallOffset();
-    return Math.ceil((t + off) / step - 1e-6) * step - off;
+  // Enter: the downbeat after one full bar of count-in, as a wall-clock time every tab can use.
+  function countIn() {
+    const bar = barDur(), wall = ctx.currentTime + wallOffset();
+    const at = (Math.ceil((wall + 0.1) / bar) + 1) * bar;
+    send('start', { at });
+    start(at, true);
+  }
+  const CLICK_GAIN = 0.18;
+  function click(t, accent) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = accent ? 1760 : 1320;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(CLICK_GAIN, t + 0.002);
+    g.gain.setTargetAtTime(0, t + 0.002, 0.025);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + 0.2);
+    clicks.push(o);
+  }
+  // Counts in the bar before atWall (with clicks in the tab that pressed Enter), then plays what this tab holds.
+  function start(atWall, withClicks) {
+    if (!ready) return;
+    const at = atWall - wallOffset(), beat = 60 / bpm;
+    for (let i = 0; i < 4; i++) {
+      const t = at - (4 - i) * beat;
+      if (t < ctx.currentTime) continue;
+      if (withClicks) click(t, i === 0);
+      schedule((t - ctx.currentTime) * 1000, () => { countText = String(i + 1); renderStatus(); });
+    }
+    schedule((at - ctx.currentTime) * 1000, () => { countText = ''; clicks.length = 0; renderStatus(); });
+    if (!held.length) return;
+    const chars = held.splice(0);
+    const stillTyping = typing.active && typing.holding;   // keys arriving now are held for the next Enter
+    Object.assign(typing, { holding: false, anchor: at, slot: 0, chord: null, lastNotes: [] });
+    chars.forEach(ch => typeToken(ch));
+    Object.assign(typing, { active: stillTyping, holding: stillTyping, chord: null });
+    renderQueue();
+    send('here');
   }
   if (channel) {
     channel.onmessage = ({ data: d }) => {
       if (!d || d.id === me) return;
       if (d.type === 'bye') { peers.delete(d.id); renderStatus(); return; }
-      peers.set(d.id, { instrument: d.instrument, seen: Date.now() });
+      peers.set(d.id, { instrument: d.instrument, ready: d.ready, seen: Date.now() });
       if (d.type === 'hello') { tempoSettled = true; send('here'); }
-      if (d.type === 'tempo' || (d.type === 'here' && !tempoSettled)) { tempoSettled = true; if (d.bpm !== bpm) setTempo(d.bpm, false); }
+      if (d.type === 'tempo' || d.type === 'start' || (d.type === 'here' && !tempoSettled)) {
+        tempoSettled = true;
+        if (d.bpm !== bpm) setTempo(d.bpm, false);
+      }
+      if (d.type === 'start') start(d.at, false);
+      if (d.type === 'stop') panic();
       renderStatus();
     };
     send('hello');

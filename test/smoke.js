@@ -126,6 +126,26 @@ async function main() {
   d.getElementById('labels').click();
   assert.ok(!d.body.classList.contains('labels'), 'labels toggle off');
 
+  // automation that sends Shift as a flag ("t" + shiftKey) and leaves e.code empty still plays sharps and phrases
+  await sleep(300);
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 't', code: 'KeyT', shiftKey: true, bubbles: true, cancelable: true }));
+  await sleep(30); assert.ok(lit(61), 'Shift flag + t plays C#4');
+  d.dispatchEvent(new w.KeyboardEvent('keyup', { key: 't', code: 'KeyT', shiftKey: true, bubbles: true, cancelable: true }));
+  await sleep(150); assert.ok(!lit(61), 'and releases');
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: '1', code: 'Digit1', shiftKey: true, bubbles: true, cancelable: true }));
+  await sleep(30); assert.ok(lit(37), 'Shift flag + 1 plays C#2');
+  d.dispatchEvent(new w.KeyboardEvent('keyup', { key: '1', code: 'Digit1', shiftKey: true, bubbles: true, cancelable: true }));
+  await sleep(150);
+  for (const k of '[io]-') {
+    d.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, code: '', bubbles: true, cancelable: true }));
+    d.dispatchEvent(new w.KeyboardEvent('keyup', { key: k, code: '', bubbles: true, cancelable: true }));
+    await sleep(3);
+  }
+  await sleep(100);
+  assert.ok(played().endsWith('[F4 G4]'), 'a phrase with empty key codes plays as a phrase');
+  await sleep(600);
+  assert.strictEqual(d.querySelectorAll('.key.on').length, 0, 'and releases');
+
   // electric piano plays on the same keys
   const inst = d.getElementById('instrument');
   inst.click();
@@ -148,48 +168,79 @@ async function main() {
   await sleep(30);
   assert.ok(d.querySelector('[data-midi="60"]').classList.contains('on'), 'synth fallback still plays');
 
-  // --- two tabs: shared tempo, typed phrases start on the same wall-clock bar ---
+  // --- two tabs: shared tempo, typed music waits for Enter, then both count in and start on the same bar ---
   const a = load({ room: 'duo' }), b = load({ room: 'duo' });
   const tab = win => ({
     d: win.document,
-    key: (type, k) => win.document.dispatchEvent(new win.KeyboardEvent(type, { key: k, code: codeFor(k), bubbles: true, cancelable: true })),
+    key: (type, k, code) => win.document.dispatchEvent(new win.KeyboardEvent(type, { key: k, code: code || codeFor(k), bubbles: true, cancelable: true })),
     played: () => win.document.getElementById('played').textContent,
+    queue: () => win.document.getElementById('queue').textContent,
+    held: () => win.document.getElementById('held').textContent,
     status: () => win.document.getElementById('status').textContent,
     bpm: () => win.document.getElementById('bpm').textContent,
+    lit: m => win.document.querySelector(`[data-midi="${m}"]`).classList.contains('on'),
   });
   const A = tab(a), B = tab(b);
   const typeIn = async (t, s) => { for (const ch of s) { t.key('keydown', ch); t.key('keyup', ch); await sleep(12); } };
   A.d.getElementById('open').click(); B.d.getElementById('open').click();
   await sleep(200);
-  assert.strictEqual(A.status(), 'In time with Piano', 'tabs find each other');
+  assert.strictEqual(A.status(), 'Other tab: Piano', 'tabs find each other');
+  assert.ok(!A.d.getElementById('together-how').hidden, 'the Enter / Esc line appears with another tab open');
   B.d.getElementById('instrument').click(); await sleep(50);
-  assert.strictEqual(A.status(), 'In time with Electric piano', 'the other tab\'s instrument is shown');
+  assert.strictEqual(A.status(), 'Other tab: Electric piano', 'the other tab\'s instrument is shown');
+  assert.strictEqual(B.d.getElementById('nameplate').textContent, 'Electric piano', 'the nameplate names the instrument');
   A.d.getElementById('faster').click(); await sleep(50);
   assert.strictEqual(B.bpm(), '130', 'tempo is shared');
   A.d.getElementById('slower').click(); await sleep(50);
   assert.strictEqual(B.bpm(), '120');
-  // 120 bpm: a bar is 2 s on the wall clock. Type into A 200 ms into a bar and into B 500 ms later.
-  while (Date.now() % 2000 < 150 || Date.now() % 2000 > 250) await sleep(5);
-  const bar = Math.ceil(Date.now() / 2000) * 2000;
+
+  // Typed parts wait, however far apart they arrive. Live playing stays immediate.
   await typeIn(A, 'tyu');
-  await sleep(500);
+  await sleep(100);
+  assert.strictEqual(A.played(), '', 'the first keystroke of a held phrase is taken back');
+  assert.strictEqual(A.held(), '   Ready, waiting for Enter: tyu', 'the held part is shown');
+  assert.strictEqual(B.status(), 'Other tab: Piano (ready)', 'the other tab shows A is ready');
+  await sleep(2300);   // more than a bar at 120 bpm
   await typeIn(B, 'qwe');
-  await sleep(bar - Date.now() - 150);
-  assert.strictEqual(A.played(), '', 'A waits for the bar, its first keystroke taken back');
-  assert.strictEqual(B.played(), '', 'B waits for the same bar');
-  assert.ok(A.d.getElementById('queue').textContent.includes('tyu'), 'the waiting phrase is shown');
-  await sleep(250);
-  assert.strictEqual(A.played(), 'C4', 'A starts on the bar');
-  assert.strictEqual(B.played(), 'F3', 'B starts on the same bar');
-  await sleep(600);
-  assert.strictEqual(A.played(), 'C4  D4  E4');
-  assert.strictEqual(B.played(), 'F3  G3  A3');
-  // live playing stays immediate with other tabs open
+  await sleep(100);
+  assert.strictEqual(A.status(), 'Other tab: Electric piano (ready)');
+  assert.strictEqual(A.played(), '', 'nothing plays before Enter');
   A.key('keydown', 'o'); await sleep(30);
-  assert.ok(A.d.querySelector('[data-midi="67"]').classList.contains('on'), 'immediate note with other tabs open');
-  A.key('keyup', 'o');
+  assert.ok(A.lit(67), 'live playing is immediate while parts wait');
+  A.key('keyup', 'o'); await sleep(200);
+
+  // Enter in A: one bar of count-in (2 s at 120 bpm), then both start on the same wall-clock bar.
+  while (Date.now() % 2000 < 150 || Date.now() % 2000 > 250) await sleep(5);
+  const downbeat = (Math.ceil(Date.now() / 2000) + 1) * 2000;
+  A.key('keydown', 'Enter', 'Enter'); A.key('keyup', 'Enter', 'Enter');
+  await sleep(2000 - Date.now() % 2000 + 600);   // into the count-in bar, which is the next full bar
+  assert.ok(/^Count-in [1-4]/.test(A.status()) && /^Count-in [1-4]/.test(B.status()), 'both tabs count in');
+  const aBefore = A.played(), bBefore = B.played();
+  await sleep(downbeat - Date.now() - 100);
+  assert.strictEqual(A.played(), aBefore, 'A waits for the downbeat');
+  assert.strictEqual(B.played(), bBefore, 'B waits for the downbeat');
+  await sleep(200);
+  assert.ok(A.played().endsWith('G4  C4'), 'A starts on the downbeat');
+  assert.ok(B.played().endsWith('F3'), 'B starts on the same downbeat');
+  await sleep(600);
+  assert.ok(A.played().endsWith('C4  D4  E4'));
+  assert.ok(B.played().endsWith('F3  G3  A3'));
+  assert.ok(!A.held() && !B.held(), 'held parts are used up');
+  assert.strictEqual(A.status(), 'Other tab: Electric piano', 'no longer ready after playing');
+
+  // Esc in one tab stops everyone, including held parts.
+  await typeIn(B, 'qwe'); await sleep(50);
+  assert.ok(A.status().endsWith('(ready)'));
+  A.key('keydown', 'Escape', 'Escape'); await sleep(50);
+  assert.strictEqual(B.held(), '', 'Esc clears the other tab\'s held part');
+  assert.strictEqual(A.status(), 'Other tab: Electric piano');
+
   b.dispatchEvent(new b.Event('pagehide')); await sleep(50);
   assert.strictEqual(A.status(), '', 'a closed tab leaves');
+  assert.ok(A.d.getElementById('together-how').hidden);
+  // Alone again: typed phrases play right away and Enter does nothing.
+  await typeIn(A, 'tyu'); await sleep(40);
+  assert.ok(A.played().endsWith('C4'), 'alone, a typed phrase starts at once');
 
   console.log('ok');
   process.exit(0);
