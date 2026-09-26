@@ -33,7 +33,7 @@ Everything lives in `index.html` (CSS and JS inline). Keep it that way until a s
 ## How to test
 
 - Human: open `index.html`, click Open the piano, play with mouse and keys.
-- Agent: with Claude in Chrome, ask it to open the page and type `tyu [io]- p  s d f  [tuo]--`. Expect a phrase in time, chords landing together, keys lighting up, the played line filling in. JS-injected input must dispatch both `keydown` and `keyup`. Agent tools differ: a `type` action that inserts text sends no key events on this page (there is no text field), so agents should press keys (`t y shift+t [ i ] -`); the page accepts Shift sent as a flag on the unshifted key and an empty `e.code`.
+- Agent: with Claude in Chrome, ask it to open the page and type `tyu [io]- p  s d f  [tuo]--`. Expect a phrase in time, chords landing together, keys lighting up, the played line filling in. JS-injected input must dispatch both `keydown` and `keyup`. Agent tools differ: a `type` action that inserts text sends no key events on this page (there is no text field), so agents should press keys with literal characters (`t y shift+t [ i ] -`); key names like `minus` send nothing in Claude in Chrome; the page accepts Shift sent as a flag on the unshifted key and an empty `e.code`.
 - `npm test` runs the page in jsdom with a fake AudioContext (no sound) and checks the input logic: immediate play, typing tempo, chords, holds, rests, sharps, tempo change, sustain, pointer, synthetic clicks, offline fallback, electric piano, two tabs holding their parts and starting on the same bar after Enter, Esc stopping both. Keep it green and extend it whenever the typing-tempo code changes.
 
 ## Backlog, roughly in order

@@ -35,6 +35,9 @@
     overflow: hidden;
   }
 
+  /* the whole instrument is the main content, so tools that read "main" read all of it */
+  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
   /* top: how to play, controls */
   .top {
     display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
@@ -155,12 +158,13 @@
 </style>
 </head>
 <body class="labels">
+<main class="stage">
 
 <header class="top">
   <p class="how">
     <b>1–0 q–p a–l z–m</b> are the white keys from C2, <b>t</b> is middle C, <b>Shift</b> adds a sharp, hold <b>Space</b> to sustain.<br>
     Type fast (keys under 70 ms apart) to play in time: space is a rest, <b>[ ]</b> a chord, <b>-</b> a hold.
-    <span id="together-how" hidden><br>With another tab open, typed music waits and shows as “ready”: <b>Enter</b> counts everyone in, <b>Esc</b> stops everyone.</span>
+    <span id="together-how" hidden><br>With another tab open, typed music waits and shows as “ready”: <b>Enter</b> counts everyone in, <b>Esc</b> stops everyone, <b>Backspace</b> clears only this tab’s part.</span>
   </p>
   <div class="controls">
     <div class="group">
@@ -178,10 +182,10 @@
   </div>
 </header>
 
-<main class="wall" id="wall">
+<div class="wall" id="wall">
   <div class="traces" id="traces" aria-hidden="true"></div>
   <p class="played"><span id="played" aria-live="polite"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
-</main>
+</div>
 
 <div class="fallboard">
   <span class="nameplate" id="nameplate">Piano</span>
@@ -196,6 +200,8 @@
   <button type="button" id="open">Open the piano</button>
   <p>Loads a sampled grand piano, about 2 MB.</p>
 </div>
+
+</main>
 
 <script>
 (() => {
@@ -588,7 +594,19 @@
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
     if (['Shift', 'Meta', 'Control', 'Alt', 'CapsLock', 'Tab'].includes(e.key)) return;
     if (!ready) { if (!opening) openPiano(); return; }
+    // Escape, Backspace and Enter end whatever was being typed, so the next keystroke starts afresh.
+    if (['Escape', 'Backspace', 'Enter'].includes(e.key)) lastChar = null;
     if (e.key === 'Escape') { panic(); if (together()) send('stop'); return; }
+    if (e.key === 'Backspace') {   // clears this tab's waiting part without stopping anyone else
+      if (held.length) {
+        e.preventDefault();
+        held.length = 0;
+        typing.active = false;
+        renderQueue();
+        send('here');
+      }
+      return;
+    }
     if (e.key === 'Enter') {
       if (e.target.closest && e.target.closest('button')) return;   // Enter on a focused control presses it
       if (together() || held.length) { e.preventDefault(); countIn(); }

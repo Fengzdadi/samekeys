@@ -53,6 +53,9 @@ async function main() {
   assert.strictEqual(d.querySelector('[data-midi="60"]').getAttribute('aria-label'), 'C4 (t)', 'middle C is t');
   assert.strictEqual(d.querySelector('[data-midi="61"]').getAttribute('aria-label'), 'C#4 (T)', 'sharps use Shift');
 
+  const main = d.querySelector('main').textContent;
+  assert.ok(main.includes('middle C') && main.includes('Open the piano') && main.includes('Tempo'),
+    'main holds the whole instrument, so tools that read "main" see the instructions, controls and lid');
   d.getElementById('open').click();
   await sleep(200);
   assert.ok(d.getElementById('gate').classList.contains('hide'), 'gate hides after opening');
@@ -227,6 +230,20 @@ async function main() {
   assert.ok(B.played().endsWith('F3  G3  A3'));
   assert.ok(!A.held() && !B.held(), 'held parts are used up');
   assert.strictEqual(A.status(), 'Other tab: Electric piano', 'no longer ready after playing');
+
+  // Backspace clears only this tab's waiting part.
+  await typeIn(B, 'qwe'); await sleep(50);
+  await typeIn(A, 'tyu'); await sleep(350);
+  B.key('keydown', 'Backspace', 'Backspace'); await sleep(50);
+  assert.strictEqual(B.held(), '', 'Backspace clears this tab\'s part');
+  assert.strictEqual(A.held(), '   Ready, waiting for Enter: tyu', 'and leaves the other tab\'s part alone');
+  assert.strictEqual(A.status(), 'Other tab: Electric piano', 'the other tab sees it is no longer ready');
+  await typeIn(B, 'qwer'); await sleep(50);
+  assert.strictEqual(B.held(), '   Ready, waiting for Enter: qwer', 'a new part can be typed after clearing');
+  B.key('keydown', 'Backspace', 'Backspace');
+  await typeIn(B, 'tyu'); await sleep(50);   // right after Backspace: the r before it must not join the new part
+  assert.strictEqual(B.held(), '   Ready, waiting for Enter: tyu', 'Backspace ends the phrase before it');
+  A.key('keydown', 'Escape', 'Escape'); await sleep(50);
 
   // Esc in one tab stops everyone, including held parts.
   await typeIn(B, 'qwe'); await sleep(50);
