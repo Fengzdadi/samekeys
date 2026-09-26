@@ -156,6 +156,32 @@
     --face-inset: 2px calc(1px + var(--g) * 12%) calc(36% + var(--g) * 20%);
     --sharp-label-bottom: calc(36% + var(--g) * 20% + 6px);
   }
+  /* Harpsichord, French style: reversed keys (ebony naturals, bone sharps) with arcaded fronts, a painted
+     green case with gilt bands. Ebony keys would vanish into the dark well, so each has a pale seam. */
+  .stage[data-instrument="harpsichord"] {
+    --band: linear-gradient(#C9A24E, #C9A24E) 0 6px / 100% 2px no-repeat,
+            linear-gradient(#C9A24E, #C9A24E) 0 calc(100% - 6px) / 100% 2px no-repeat,
+            linear-gradient(#46644C, #3F5B45 50%, #324A38);
+    --band-line: #C9A24E;
+    --plate: var(--ivory);
+    --status-color: rgba(247,242,231,.8);
+    --well: #16120F;
+    --slip: linear-gradient(#C9A24E, #C9A24E) 0 2px / 100% 1px no-repeat, linear-gradient(#3F5B45, #2C4031);
+    --natural: radial-gradient(circle at 50% 100%, transparent 3px, #B98A55 3px 4px, transparent 4.5px) 50% 100% / 9px 6px repeat-x,
+               linear-gradient(#B98A55, #B98A55) 0 calc(100% - 6px) / 100% 1px no-repeat,
+               linear-gradient(#2A211B, #1E1712 60%, #17110D);
+    --natural-radius: 0 0 2px 2px;
+    --natural-shadow: inset 1px 0 0 rgba(237,227,204,.4), inset -1px 0 0 rgba(237,227,204,.4), 0 3px 0 #0B0806, 0 6px 8px rgba(0,0,0,.4);
+    --natural-shadow-on: inset 1px 0 0 rgba(237,227,204,.4), inset -1px 0 0 rgba(237,227,204,.4), 0 1px 0 #0B0806, 0 2px 3px rgba(0,0,0,.35);
+    --natural-label: #EFE6D2;
+    --natural-press: var(--brass-light); --natural-press-min: .8; --natural-label-on: var(--ink);
+    --sharp: linear-gradient(#F4ECD8, #EDE3CC 70%, #DDD1B6);
+    --sharp-radius: 0 0 2px 2px;
+    --sharp-shadow: inset 0 -3px 0 #3A2C22, 0 3px 0 #0B0806, 0 6px 8px rgba(0,0,0,.4);
+    --sharp-shadow-on: inset 0 -3px 0 #3A2C22, 0 1px 0 #0B0806, 0 2px 3px rgba(0,0,0,.35);
+    --sharp-label: var(--ink); --sharp-label-bottom: 10px;
+    --sharp-press: var(--brass-deep); --sharp-press-min: .9; --sharp-label-on: var(--ivory);
+  }
   /* Organ: a cherry cabinet with a row of drawbars (a picture of the registration the sound uses, not
      a control), flat-fronted waterfall keys. */
   .stage[data-instrument="organ"] {
