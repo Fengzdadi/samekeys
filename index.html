@@ -825,6 +825,8 @@
       noteOff(m, undefined, voice);
     });
     offTimers.set(m, { voice, timer });
+    // Tell the stage now, not when this timer fires: a silent tab in the background runs its timers late.
+    if (voice && voice.shared && !pedalOn()) send('off', { n: voice.shared, at: when + wallOffset(), planned: true });
   }
   // Silences an immediate note that turned out to be the first character of a phrase moved to the next bar.
   function takeBack(m) {
@@ -908,7 +910,7 @@
     const line = playedEl.parentElement;
     playedEl.textContent = groups.map(groupText).join('  ');
     // Drop the oldest notes until the line fits, so the newest stay visible.
-    while (groups.length > 1 && line.scrollWidth > line.clientWidth) {
+    while (groups.length > 1 && line.clientWidth && line.scrollWidth > line.clientWidth) {   // no width: not laid out, keep all
       groups.shift();
       playedEl.textContent = groups.map(groupText).join('  ');
     }
@@ -1370,7 +1372,7 @@
   let stageMode = false, noteSeq = 0;
   function shareNote(v, m, vel, when) {
     if (stageMode || !stageOpen()) return;
-    const n = ++noteSeq;
+    const n = v.shared = ++noteSeq;
     send('note', { n, midi: m, vel, at: when + wallOffset() });
     const stop = v.stop;
     v.stop = (t, tau) => { stop(t, tau); send('off', { n, at: t + wallOffset(), tau, cut: !!v.cut }); };
@@ -1440,7 +1442,7 @@
   }
   function renderStripLine(st) {
     st.line.textContent = st.groups.map(groupText).join('  ');
-    while (st.groups.length > 1 && st.line.scrollWidth > st.line.clientWidth) {
+    while (st.groups.length > 1 && st.line.clientWidth && st.line.scrollWidth > st.line.clientWidth) {
       st.groups.shift();
       st.line.textContent = st.groups.map(groupText).join('  ');
     }
@@ -1474,19 +1476,40 @@
     });
     renderStrips();
   }
+  // Releases come twice: planned ahead, as soon as the player knows them (a "-" can move one later), and
+  // again when the player's own timer fires, which a silent background tab can run a second or more late.
+  // So the stage keeps time itself: it releases at the planned moment, and a late message can only bring
+  // a release earlier, never hold a key down.
   function stageOff(d) {
     const key = d.id + ':' + d.n, e = stageVoices.get(key);
     if (!e) return;
-    stageVoices.delete(key);
     if (d.cut) {   // the player took the note back: the first note of a phrase it then held for Enter
+      stageVoices.delete(key);
+      clearTimeout(e.timer);
       e.cut = true;
       e.voice.stop(ctx.currentTime, 0.01);
       if (e.lit) { stripKey(e.st, e.m, 0, -1); stripUnlog(e.st, e.m, e.when); }
       return;
     }
-    const t = Math.max(ctx.currentTime, d.at - wallOffset());
-    e.voice.stop(t, d.tau);
-    schedule((t - ctx.currentTime) * 1000, () => { if (e.lit) stripKey(e.st, e.m, 0, -1); else e.cut = true; });
+    let t = Math.max(ctx.currentTime, d.at - wallOffset());
+    if (d.planned) e.planned = t;
+    else if (e.planned != null) t = Math.min(t, e.planned);
+    if (d.tau !== undefined) e.tau = d.tau;
+    clearTimeout(e.timer); timers.delete(e.timer);
+    e.timer = schedule((t - ctx.currentTime) * 1000, () => {
+      stageVoices.delete(key);
+      e.voice.stop(ctx.currentTime, e.tau);
+      if (e.lit) stripKey(e.st, e.m, 0, -1); else e.cut = true;
+    });
+  }
+  // A player that leaves mid-note takes its notes with it.
+  function stageDrop(id) {
+    for (const [key, e] of stageVoices) {
+      if (!key.startsWith(id + ':')) continue;
+      clearTimeout(e.timer);
+      e.voice.stop(ctx.currentTime);
+      stageVoices.delete(key);
+    }
   }
   const stageBtn = document.getElementById('stage-toggle');
   function setStage(on) {
@@ -1506,7 +1529,7 @@
   if (channel) {
     channel.onmessage = ({ data: d }) => {
       if (!d || d.id === me) return;
-      if (d.type === 'bye') { peers.delete(d.id); renderStatus(); return; }
+      if (d.type === 'bye') { if (stageMode) stageDrop(d.id); peers.delete(d.id); renderStatus(); return; }
       peers.set(d.id, { role: d.role, instrument: d.instrument, ready: d.ready, seen: Date.now() });
       if (d.type === 'note') { if (stageMode) stageNote(d); return; }
       if (d.type === 'off') { if (stageMode) stageOff(d); return; }

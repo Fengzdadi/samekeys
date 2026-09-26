@@ -77,13 +77,14 @@ class FakeCtx {
   decodeAudioData() { return Promise.resolve({ duration: 1 }); }
 }
 // Each group of windows gets its own channel name, so windows from earlier checks don't join later ones.
-function load({ offline = false, room = 'solo' } = {}) {
+// lag: this window's timers fire late, as in a silent background tab that the browser slows down
+function load({ offline = false, room = 'solo', lag = 0 } = {}) {
   const dom = new JSDOM(html, {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost/',
     beforeParse(w) {
       w.AudioContext = FakeCtx;
-      w.setTimeout = (fn, ms, ...args) => clock.set(() => fn(...args), ms);
-      w.setInterval = (fn, ms, ...args) => clock.set(() => fn(...args), ms, Math.max(1, Number(ms) || 0));
+      w.setTimeout = (fn, ms, ...args) => clock.set(() => fn(...args), (Number(ms) || 0) + lag);
+      w.setInterval = (fn, ms, ...args) => clock.set(() => fn(...args), (Number(ms) || 0) + lag, Math.max(1, Number(ms) || 0));
       w.clearTimeout = w.clearInterval = id => clock.clear(id);
       const opened = clock.now;
       w.performance.now = () => clock.now - opened;
@@ -431,6 +432,25 @@ async function main() {
   await typeIn(P2, 'rty'); await sleep(50);
   S.key('keydown', 'Escape', 'Escape'); await sleep(50);
   assert.strictEqual(P2.held(), '', 'Esc on the stage clears the players\' waiting parts');
+
+  // A player in the background, silent while the stage plays, has its timers slowed down; the stage
+  // must still release every key on time, not when the late player gets round to it.
+  const L = tab(load({ room: 'hall', lag: 1500 }));
+  L.d.getElementById('open').click(); await sleep(1700);
+  pick(L.d, 'Organ'); await sleep(50);
+  await typeIn(L, 'tyu-'); await sleep(100);
+  await sleep((2200 - clock.now % 2000) % 2000);   // Enter 200 ms into a bar
+  const down = (Math.ceil(clock.now / 2000) + 1) * 2000;
+  S.key('keydown', 'Enter', 'Enter'); S.key('keyup', 'Enter', 'Enter');
+  await sleep(down - clock.now + 300);   // C4 sounded 0 to 240 ms, D4 is sounding now
+  const organDown = () => stripOf('organ').querySelectorAll('.key.on').length;
+  assert.strictEqual(organDown(), 1, 'the stage has released C4 on time, with only D4 down');
+  await sleep(500);                     // E4's own slot ended at 740 ms; its "-" holds it to 990 ms
+  assert.strictEqual(organDown(), 1, 'a "-" still holds E4 on the stage');
+  await sleep(300);
+  assert.strictEqual(organDown(), 0, 'and the stage lets it go when the hold ends, not seconds later');
+  L.d.defaultView.dispatchEvent(new L.d.defaultView.Event('pagehide')); await sleep(50);
+  assert.ok(!stripOf('organ'), 'a player that leaves takes its strip with it');
 
   // leaving the stage: back to a player, and the others hear themselves again
   S.d.getElementById('stage-toggle').click(); await sleep(50);
