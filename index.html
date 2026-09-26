@@ -266,7 +266,14 @@
   }
 
   /* ---------- audio ---------- */
-  const INSTRUMENTS = [{ id: 'piano', name: 'Piano' }, { id: 'epiano', name: 'Electric piano' }];
+  const INSTRUMENTS = [
+    { id: 'piano', name: 'Piano' },
+    { id: 'epiano', name: 'Electric piano', voice: electricPiano },
+    { id: 'harpsichord', name: 'Harpsichord', voice: harpsichord },
+    { id: 'organ', name: 'Organ', voice: organ },
+    { id: 'marimba', name: 'Marimba', voice: marimba },
+    { id: 'musicbox', name: 'Music box', voice: musicBox },
+  ];
   let instrument = INSTRUMENTS[0];
   let ctx = null, master = null, ready = false, opening = false, useSynth = false;
   const samples = [];
@@ -312,7 +319,7 @@
   }
 
   function makeVoice(m, vel, when) {
-    if (instrument.id === 'epiano') return electricPiano(m, vel, when);
+    if (instrument.voice) return instrument.voice(m, vel, when);
     const level = 0.15 + 0.85 * Math.pow(vel, 1.5);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, when);
@@ -367,6 +374,118 @@
       g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tau);
       oscs.forEach(o => o.stop(t + 8 * tau));
     } };
+  }
+
+  /* The synthesized instruments below need no downloads. Each returns the same voice handle. */
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  const up = m => (m - LOW) / (HIGH - LOW);   // 0 at the bottom key, 1 at the top
+  function voiceGain(level, when, attack) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(level, when + attack);
+    g.connect(master);
+    return g;
+  }
+  // Sources that ring out on their own carry `end`, so a release never keeps them alive longer.
+  function voiceHandle(g, srcs, when, release) {
+    return { when, stop(t, tau = release) {
+      g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0, t, tau);
+      srcs.forEach(o => o.stop(Math.min(o.end ?? Infinity, t + 8 * tau)));
+    } };
+  }
+  // A sine partial struck at `amp` that dies away with time constant `tau`.
+  function partial(dest, freq, amp, tau, when) {
+    const o = ctx.createOscillator(); o.frequency.value = freq;
+    const a = ctx.createGain();
+    a.gain.setValueAtTime(0, when);
+    a.gain.linearRampToValueAtTime(amp, when + 0.002);
+    a.gain.setTargetAtTime(0, when + 0.002, tau);
+    o.connect(a).connect(dest);
+    o.end = when + 0.002 + 7 * tau;
+    o.start(when); o.stop(o.end);
+    return o;
+  }
+
+  // Harpsichord: a plucked string by Karplus-Strong, computed once per note. The buffer's sample rate
+  // is a whole multiple of the pitch, so every note is exactly in tune. Two choirs, 8' and 4', like
+  // the stops on a real one. The quill plucks near the end of the string, hence the comb in the noise.
+  const HC_GAIN = 0.55, HC_FOUR = 0.35, HC_RING = 4, HC_RELEASE = 0.05, HC_STRETCH = 0.35;
+  const strings = new Map();
+  function pluckedString(m) {
+    if (strings.has(m)) return strings.get(m);
+    const f = mtof(m), N = Math.max(4, Math.round(ctx.sampleRate / f)), sr = N * f;
+    const ring = Math.max(0.6, HC_RING * (1.25 - up(m)));
+    const len = Math.ceil(sr * ring), buf = ctx.createBuffer(1, len, sr), y = buf.getChannelData(0);
+    const x = Array.from({ length: N }, () => Math.random() * 2 - 1);
+    const P = Math.max(1, Math.round(N / 9));   // the difference also removes any DC
+    let peak = 0;
+    for (let i = 0; i < N; i++) { y[i] = x[i] - x[(i + N - P) % N]; peak = Math.max(peak, Math.abs(y[i])); }
+    for (let i = 0; i < N; i++) y[i] /= peak;
+    const rho = Math.pow(0.001, 1 / (ring * f));
+    for (let i = N; i < len; i++) y[i] = rho * ((1 - HC_STRETCH) * y[i - N] + HC_STRETCH * y[Math.max(0, i - N - 1)]);
+    const fade = Math.min(len, Math.round(sr * 0.05));
+    for (let i = 0; i < fade; i++) y[len - 1 - i] *= i / fade;
+    strings.set(m, buf);
+    return buf;
+  }
+  function harpsichord(m, vel, when) {
+    const g = voiceGain(HC_GAIN * (0.6 + 0.4 * vel), when, 0.001);
+    const srcs = [[m, 1], [m + 12, HC_FOUR]].map(([n, amp]) => {
+      const src = ctx.createBufferSource();
+      src.buffer = pluckedString(n);
+      const a = ctx.createGain(); a.gain.value = amp;
+      src.connect(a).connect(g);
+      src.end = when + src.buffer.duration;
+      src.start(when);
+      return src;
+    });
+    return voiceHandle(g, srcs, when, HC_RELEASE);
+  }
+
+  // Organ: drawbar harmonics in one band-limited wave, a 16' sub-octave, a percussion blip on the
+  // third harmonic, and a slow vibrato. Like a real organ it ignores velocity and holds while pressed.
+  const ORGAN_GAIN = 0.26, ORGAN_SUB = 0.5, ORGAN_PERC = 0.35, ORGAN_VIBRATO = 0.004, ORGAN_RELEASE = 0.03;
+  const DRAWBARS = [0, 1, 0.55, 0.5, 0.35, 0, 0.2, 0, 0.12];   // harmonics 1..8
+  let organWave = null;
+  function organ(m, vel, when) {
+    const f = mtof(m);
+    organWave = organWave || ctx.createPeriodicWave(new Float32Array(DRAWBARS.length), Float32Array.from(DRAWBARS));
+    const g = voiceGain(ORGAN_GAIN, when, 0.006);
+    const main = ctx.createOscillator(); main.setPeriodicWave(organWave); main.frequency.value = f;
+    const sub = ctx.createOscillator(); sub.frequency.value = f / 2;
+    const subG = ctx.createGain(); subG.gain.value = ORGAN_SUB;
+    main.connect(g); sub.connect(subG).connect(g);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 6.2;
+    const depth = ctx.createGain(); depth.gain.value = f * ORGAN_VIBRATO;
+    lfo.connect(depth); depth.connect(main.frequency); depth.connect(sub.frequency);
+    const srcs = [main, sub, lfo];
+    srcs.forEach(o => o.start(when));
+    if (f * 3 < 16000) srcs.push(partial(g, f * 3, ORGAN_PERC, 0.2, when));
+    return voiceHandle(g, srcs, when, ORGAN_RELEASE);
+  }
+
+  // Marimba: a wooden bar is tuned so its first overtone sits two octaves up; a third, very short
+  // partial is the mallet. Low bars ring longer than high ones, and the notes ring out after release.
+  const MAR_GAIN = 0.65, MAR_RING = 0.9, MAR_RELEASE = 0.25;
+  function marimba(m, vel, when) {
+    const f = mtof(m), bright = 0.4 + 0.6 * vel;
+    const g = voiceGain(MAR_GAIN * (0.15 + 0.85 * Math.pow(vel, 1.5)), when, 0.002);
+    const srcs = [partial(g, f, 1, MAR_RING * (1.1 - 0.85 * up(m)), when)];
+    if (f * 4 < 15000) srcs.push(partial(g, f * 4, 0.3 * bright, 0.07, when));
+    if (f * 9.9 < 15000) srcs.push(partial(g, f * 9.9, 0.1 * bright, 0.012, when));
+    return voiceHandle(g, srcs, when, MAR_RELEASE);
+  }
+
+  // Music box: a plucked steel tine. Its overtones are inharmonic (6.27 and 17.55 times the pitch),
+  // and a second, slightly mistuned sine gives the slow shimmer of a comb. Nothing damps it.
+  const MB_GAIN = 0.45, MB_RING = 2.2, MB_RELEASE = 0.6;
+  function musicBox(m, vel, when) {
+    const f = mtof(m), ring = MB_RING * (1.15 - 0.8 * up(m));
+    const g = voiceGain(MB_GAIN * (0.3 + 0.7 * vel), when, 0.001);
+    const srcs = [partial(g, f, 1, ring, when), partial(g, f * 1.0025, 0.35, ring, when)];
+    if (f * 6.27 < 16000) srcs.push(partial(g, f * 6.27, 0.35 * vel, 0.12, when));
+    if (f * 17.55 < 16000) srcs.push(partial(g, f * 17.55, 0.12 * vel, 0.015, when));
+    return voiceHandle(g, srcs, when, MB_RELEASE);
   }
 
   /* ---------- note state ---------- */

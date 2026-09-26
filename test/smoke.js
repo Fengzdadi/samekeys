@@ -9,7 +9,7 @@ const t0 = Date.now();
 class FakeParam { constructor(v) { this.value = v; } setValueAtTime() {} linearRampToValueAtTime() {} setTargetAtTime() {} cancelScheduledValues() {} }
 class FakeNode {
   constructor() { for (const p of ['gain', 'frequency', 'playbackRate', 'threshold', 'ratio', 'attack', 'release']) this[p] = new FakeParam(0); }
-  connect(n) { return n; } start() {} stop() {}
+  connect(n) { return n; } start() {} stop() {} setPeriodicWave() {}
 }
 class FakeCtx {
   constructor() { this.state = 'running'; this.destination = new FakeNode(); }
@@ -17,6 +17,9 @@ class FakeCtx {
   resume() { return Promise.resolve(); }
   createGain() { return new FakeNode(); } createDynamicsCompressor() { return new FakeNode(); }
   createBufferSource() { return new FakeNode(); } createOscillator() { return new FakeNode(); }
+  get sampleRate() { return 44100; }
+  createPeriodicWave() { return {}; }
+  createBuffer(ch, len, sr) { const data = new Float32Array(len); return { duration: len / sr, getChannelData: () => data }; }
   decodeAudioData() { return Promise.resolve({ duration: 1 }); }
 }
 // Each group of windows gets its own channel name, so windows from earlier checks don't join later ones.
@@ -159,6 +162,18 @@ async function main() {
   assert.ok(!lit(64), 'electric piano releases');
   await typeString('tyu'); await sleep(900);
   assert.ok(played().endsWith('C4  D4  E4'), 'electric piano plays a typed phrase');
+  // every other instrument plays, releases and takes a typed chord
+  for (const name of ['Harpsichord', 'Organ', 'Marimba', 'Music box']) {
+    inst.click();
+    assert.strictEqual(inst.getAttribute('aria-label'), 'Instrument: ' + name);
+    assert.strictEqual(d.getElementById('nameplate').textContent, name, name + ' is on the nameplate');
+    key('keydown', 'u'); await sleep(30);
+    assert.ok(lit(64), name + ' plays');
+    key('keyup', 'u'); await sleep(150);
+    assert.ok(!lit(64), name + ' releases');
+    await typeString('[tu]o'); await sleep(700);
+    assert.ok(played().endsWith('[C4 E4]  G4'), name + ' plays a typed chord');
+  }
   inst.click();
   assert.strictEqual(inst.textContent, 'Piano', 'instrument cycles back');
   assert.strictEqual(d.getElementById('status').textContent, '', 'alone: no ensemble status');

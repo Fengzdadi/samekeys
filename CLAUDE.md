@@ -25,7 +25,7 @@ Everything lives in `index.html` (CSS and JS inline). Keep it that way until a s
 ## Sound
 
 - Salamander grand piano samples: 30 files, one every three semitones, about 2 MB total, pitched with `playbackRate`. Currently fetched from tonejs.github.io with raw.githubusercontent.com as fallback; self-hosting them under `assets/salamander/` is on the backlog. Keep the built-in synth fallback for offline use.
-- Instruments share the keys and the notation. The electric piano is two-operator FM (no samples); its knobs are the `EP_` constants.
+- Instruments share the keys and the notation, and cycle on the one Instrument button. Only the piano uses samples; the rest are synthesized in the page, each with its knobs as constants: electric piano (two-operator FM, `EP_`), harpsichord (Karplus-Strong strings computed once per note, 8' and 4' choirs, `HC_`), organ (drawbar wave, sub-octave, percussion, vibrato, `ORGAN_`), marimba (tuned bar partials, `MAR_`), music box (inharmonic tine partials, `MB_`). A new instrument is one voice function returning the same `{ when, stop(t, tau) }` handle plus an entry in `INSTRUMENTS`.
 - Audio starts only after the "Open the piano" click, because browsers require a gesture. Keep that gate; it is also the page's one moment of ceremony.
 - Note onsets are scheduled on the AudioContext clock. Releases and visuals use timers. Never schedule an onset with `setTimeout`.
 - Nobody has listened to v0 yet. Tune the velocity curve, release time, compressor and per-key balance by ear before anything else.
@@ -34,7 +34,7 @@ Everything lives in `index.html` (CSS and JS inline). Keep it that way until a s
 
 - Human: open `index.html`, click Open the piano, play with mouse and keys.
 - Agent: with Claude in Chrome, ask it to open the page and type `tyu [io]- p  s d f  [tuo]--`. Expect a phrase in time, chords landing together, keys lighting up, the played line filling in. JS-injected input must dispatch both `keydown` and `keyup`. Agent tools differ: a `type` action that inserts text sends no key events on this page (there is no text field), so agents should press keys with literal characters (`t y shift+t [ i ] -`); key names like `minus` send nothing in Claude in Chrome; the page accepts Shift sent as a flag on the unshifted key and an empty `e.code`.
-- `npm test` runs the page in jsdom with a fake AudioContext (no sound) and checks the input logic: immediate play, typing tempo, chords, holds, rests, sharps, tempo change, sustain, pointer, synthetic clicks, offline fallback, electric piano, two tabs holding their parts and starting on the same bar after Enter, Esc stopping both. Keep it green and extend it whenever the typing-tempo code changes.
+- `npm test` runs the page in jsdom with a fake AudioContext (no sound) and checks the input logic: immediate play, typing tempo, chords, holds, rests, sharps, tempo change, sustain, pointer, synthetic clicks, offline fallback, every instrument, two tabs holding their parts and starting on the same bar after Enter, Esc stopping both. Keep it green and extend it whenever the typing-tempo code changes.
 
 ## Backlog, roughly in order
 
@@ -42,4 +42,4 @@ Everything lives in `index.html` (CSS and JS inline). Keep it that way until a s
 2. Self-host the samples and drop the external fetches.
 3. Deploy as a static site (GitHub Pages or Cloudflare Pages).
 4. Run the Claude in Chrome test and write down what breaks.
-5. Later, maybe: more instruments on the same keys (electric piano, marimba), 88 keys, and a shared room so others can hear an agent play — a thin relay of note events like multiplayerpiano.com, not a stage server with queues and clocks.
+5. Later, maybe: 88 keys, and a shared room so others can hear an agent play — a thin relay of note events like multiplayerpiano.com, not a stage server with queues and clocks.
