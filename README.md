@@ -6,7 +6,7 @@ One web page, one piano, no server. People play it with a mouse, a touchscreen o
 
 ## How to play
 
-- `1–0 q–p a–l z–m` are the white keys from C2 up. `t` is middle C. `Shift` adds a sharp. Hold `Space` to sustain.
+- `1–0 q–p a–l z–m` are the natural keys from C2 up. `t` is middle C. `Shift` adds a sharp. Hold `Space` to sustain.
 - Type fast and the notes play in time, one character per eighth note: a space is a rest, `[ ]` plays a chord, `-` holds the last note.
 - Letter sheets written for virtualpiano.net work as they are.
 
