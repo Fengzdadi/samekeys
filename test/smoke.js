@@ -5,15 +5,67 @@ const path = require('path');
 const assert = require('assert');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const t0 = Date.now();
+
+// One fake clock for every window. Page timers, performance.now(), Date.now(), the audio clock and the
+// messages between tabs all run on it, and the test moves it forward, so the results depend on the code
+// alone and never on how busy the machine is. Due callbacks run in time order, then in the order they
+// were set; promises settle between them, as they would in a browser.
+const clock = {
+  now: 1_000_000,   // wall-clock ms; a multiple of the 2 s bar, like any other instant
+  seq: 0,
+  timers: new Map(),   // id -> { id, at, fn, every, seq }
+  set(fn, ms, every) {
+    const id = ++this.seq;
+    this.timers.set(id, { id, at: this.now + Math.max(0, Number(ms) || 0), fn, every, seq: id });
+    return id;
+  },
+  clear(id) { this.timers.delete(id); },
+  async advance(ms) {
+    const end = this.now + ms;
+    await settle();
+    for (;;) {
+      let next = null;
+      for (const t of this.timers.values())
+        if (t.at <= end && (!next || t.at < next.at || (t.at === next.at && t.seq < next.seq))) next = t;
+      if (!next) break;
+      this.now = Math.max(this.now, next.at);
+      if (next.every) { next.at += next.every; next.seq = ++this.seq; } else this.timers.delete(next.id);
+      next.fn();
+      await settle();
+    }
+    this.now = end;
+    await settle();
+  },
+};
+const settle = () => new Promise(r => setImmediate(r));   // lets pending promises run
+const sleep = ms => clock.advance(ms);
+
+// BroadcastChannel on the fake clock: a message reaches every other tab on the same channel a moment later.
+const channels = new Map();
+class FakeChannel {
+  constructor(name) {
+    this.name = name;
+    this.onmessage = null;
+    if (!channels.has(name)) channels.set(name, new Set());
+    channels.get(name).add(this);
+  }
+  postMessage(data) {
+    for (const other of channels.get(this.name)) {
+      if (other === this) continue;
+      const copy = structuredClone(data);
+      clock.set(() => other.onmessage && other.onmessage({ data: copy }), 0);
+    }
+  }
+  close() { channels.get(this.name).delete(this); }
+}
 class FakeParam { constructor(v) { this.value = v; } setValueAtTime() {} linearRampToValueAtTime() {} setTargetAtTime() {} cancelScheduledValues() {} }
 class FakeNode {
   constructor() { for (const p of ['gain', 'frequency', 'playbackRate', 'threshold', 'ratio', 'attack', 'release']) this[p] = new FakeParam(0); }
   connect(n) { return n; } start() {} stop() {} setPeriodicWave() {}
 }
 class FakeCtx {
-  constructor() { this.state = 'running'; this.destination = new FakeNode(); }
-  get currentTime() { return (Date.now() - t0) / 1000; }
+  constructor() { this.state = 'running'; this.destination = new FakeNode(); this.t0 = clock.now; }
+  get currentTime() { return (clock.now - this.t0) / 1000; }   // each context starts at 0, as in a browser
   resume() { return Promise.resolve(); }
   createGain() { return new FakeNode(); } createDynamicsCompressor() { return new FakeNode(); }
   createBufferSource() { return new FakeNode(); } createOscillator() { return new FakeNode(); }
@@ -28,7 +80,13 @@ function load({ offline = false, room = 'solo' } = {}) {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost/',
     beforeParse(w) {
       w.AudioContext = FakeCtx;
-      w.BroadcastChannel = class extends BroadcastChannel { constructor(name) { super(name + ':' + room); } };
+      w.setTimeout = (fn, ms, ...args) => clock.set(() => fn(...args), ms);
+      w.setInterval = (fn, ms, ...args) => clock.set(() => fn(...args), ms, Math.max(1, Number(ms) || 0));
+      w.clearTimeout = w.clearInterval = id => clock.clear(id);
+      const opened = clock.now;
+      w.performance.now = () => clock.now - opened;
+      w.Date.now = () => clock.now;
+      w.BroadcastChannel = class extends FakeChannel { constructor(name) { super(name + ':' + room); } };
       w.matchMedia = () => ({ matches: false });
       w.fetch = offline
         ? () => Promise.reject(new Error('offline'))
@@ -38,7 +96,6 @@ function load({ offline = false, room = 'solo' } = {}) {
   });
   return dom.window;
 }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 // The instrument buttons, as a person or an agent finds them: by their visible name.
 const pick = (doc, name) => [...doc.querySelectorAll('#instruments button')].find(b => b.textContent === name).click();
 const picked = doc => [...doc.querySelectorAll('#instruments button[aria-pressed="true"]')].map(b => b.textContent).join();
@@ -87,6 +144,14 @@ async function main() {
   assert.strictEqual(queue(), '', 'queue drains');
   await sleep(300);
   assert.strictEqual(d.querySelectorAll('.key.on').length, 0, 'nothing stays lit');
+
+  // the 70 ms line, exactly: keys 50 ms apart are typing and wait for their slots, 90 ms apart are played live
+  await typeString('tyu', 50);
+  assert.ok(played().endsWith('A4  C4') && queue().includes('yu'), 'keys 50 ms apart are typed');
+  await sleep(1000);
+  await typeString('tyu', 90);
+  assert.ok(played().endsWith('C4  D4  E4') && queue() === '', 'keys 90 ms apart are played as they come');
+  await sleep(500);
 
   // chord first, repeated notes, sharps, Escape
   await typeString('[tyu] tt'); await sleep(900);
@@ -238,18 +303,18 @@ async function main() {
   A.key('keyup', 'o'); await sleep(200);
 
   // Enter in A: one bar of count-in (2 s at 120 bpm), then both start on the same wall-clock bar.
-  while (Date.now() % 2000 < 150 || Date.now() % 2000 > 250) await sleep(5);
-  const downbeat = (Math.ceil(Date.now() / 2000) + 1) * 2000;
+  await sleep((2200 - clock.now % 2000) % 2000);   // press Enter 200 ms into a bar
+  const downbeat = (Math.ceil(clock.now / 2000) + 1) * 2000;
   A.key('keydown', 'Enter', 'Enter'); A.key('keyup', 'Enter', 'Enter');
   await sleep(50);
   assert.ok(A.status().startsWith('Starting on the next bar') && B.status().startsWith('Starting on the next bar'),
     'right after Enter, both tabs say the music starts on the next bar');
   assert.strictEqual(A.d.getElementById('count').textContent, 'Starting on the next bar', 'and show it large on the wall');
-  await sleep(2000 - Date.now() % 2000 + 600);   // into the count-in bar, which is the next full bar
+  await sleep(2000 - clock.now % 2000 + 600);   // into the count-in bar, which is the next full bar
   assert.ok(/^Count-in [1-4]/.test(A.status()) && /^Count-in [1-4]/.test(B.status()), 'both tabs count in');
   assert.ok(/^[1-4]$/.test(B.d.getElementById('count').textContent), 'the beat is shown large');
   const aBefore = A.played(), bBefore = B.played();
-  await sleep(downbeat - Date.now() - 100);
+  await sleep(downbeat - clock.now - 100);
   assert.strictEqual(A.played(), aBefore, 'A waits for the downbeat');
   assert.strictEqual(B.played(), bBefore, 'B waits for the downbeat');
   await sleep(200);
@@ -287,7 +352,7 @@ async function main() {
   assert.strictEqual(A.status(), '', 'a closed tab leaves');
   assert.ok(A.d.getElementById('together-how').hidden);
   // Alone again: typed phrases play right away and Enter does nothing.
-  await typeIn(A, 'tyu'); await sleep(120);   // well before D4 is due (250 ms), with room for a busy machine
+  await typeIn(A, 'tyu'); await sleep(40);   // well before D4 is due (250 ms)
   assert.ok(A.played().endsWith('C4'), 'alone, a typed phrase starts at once');
 
   console.log('ok');
