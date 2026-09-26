@@ -39,6 +39,9 @@ function load({ offline = false, room = 'solo' } = {}) {
   return dom.window;
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// The instrument buttons, as a person or an agent finds them: by their visible name.
+const pick = (doc, name) => [...doc.querySelectorAll('#instruments button')].find(b => b.textContent === name).click();
+const picked = doc => [...doc.querySelectorAll('#instruments button[aria-pressed="true"]')].map(b => b.textContent).join();
 const codeFor = ch => /[a-z]/i.test(ch) ? 'Key' + ch.toUpperCase()
   : ch === ' ' ? 'Space' : ch === '[' ? 'BracketLeft' : ch === ']' ? 'BracketRight' : ch === '-' ? 'Minus' : 'Digit' + ch;
 
@@ -57,7 +60,7 @@ async function main() {
   assert.strictEqual(d.querySelector('[data-midi="61"]').getAttribute('aria-label'), 'C#4 (T)', 'sharps use Shift');
 
   const main = d.querySelector('main').textContent;
-  assert.ok(main.includes('middle C') && main.includes('Open the piano') && main.includes('Tempo'),
+  assert.ok(main.includes('middle C') && main.includes('Open the piano') && main.includes('Sustain') && main.includes('Harpsichord'),
     'main holds the whole instrument, so tools that read "main" see the instructions, controls and lid');
   d.getElementById('open').click();
   await sleep(200);
@@ -153,9 +156,10 @@ async function main() {
   assert.strictEqual(d.querySelectorAll('.key.on').length, 0, 'and releases');
 
   // electric piano plays on the same keys
-  const inst = d.getElementById('instrument');
-  inst.click();
-  assert.strictEqual(inst.getAttribute('aria-label'), 'Instrument: Electric piano');
+  assert.strictEqual(d.querySelectorAll('#instruments button').length, 6, 'all six instruments are visible buttons');
+  assert.strictEqual(picked(d), 'Piano', 'the piano is chosen at first');
+  pick(d, 'Electric piano');
+  assert.strictEqual(picked(d), 'Electric piano', 'exactly one instrument is pressed');
   key('keydown', 'u'); await sleep(30);
   assert.ok(lit(64), 'electric piano plays');
   key('keyup', 'u'); await sleep(150);
@@ -164,9 +168,8 @@ async function main() {
   assert.ok(played().endsWith('C4  D4  E4'), 'electric piano plays a typed phrase');
   // every other instrument plays, releases and takes a typed chord
   for (const name of ['Harpsichord', 'Organ', 'Marimba', 'Music box']) {
-    inst.click();
-    assert.strictEqual(inst.getAttribute('aria-label'), 'Instrument: ' + name);
-    assert.strictEqual(d.getElementById('nameplate').textContent, name, name + ' is on the nameplate');
+    pick(d, name);
+    assert.strictEqual(picked(d), name);
     assert.strictEqual(d.getElementById('keys').getAttribute('aria-label'), name + ' keys', 'the keyboard group names the instrument');
     key('keydown', 'u'); await sleep(30);
     assert.ok(lit(64), name + ' plays');
@@ -176,8 +179,8 @@ async function main() {
     assert.ok(played().endsWith('[C4 E4]  G4'), name + ' plays a typed chord');
   }
   assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'musicbox', 'the materials follow the instrument');
-  inst.click();
-  assert.strictEqual(inst.textContent, 'Piano', 'instrument cycles back');
+  pick(d, 'Piano');
+  assert.strictEqual(picked(d), 'Piano', 'back to the piano');
   assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'piano');
   assert.strictEqual(d.getElementById('status').textContent, '', 'alone: no ensemble status');
 
@@ -207,9 +210,10 @@ async function main() {
   await sleep(200);
   assert.strictEqual(A.status(), 'Other tab: Piano', 'tabs find each other');
   assert.ok(!A.d.getElementById('together-how').hidden, 'the Enter / Esc line appears with another tab open');
-  B.d.getElementById('instrument').click(); await sleep(50);
+  pick(B.d, 'Electric piano'); await sleep(50);
   assert.strictEqual(A.status(), 'Other tab: Electric piano', 'the other tab\'s instrument is shown');
-  assert.strictEqual(B.d.getElementById('nameplate').textContent, 'Electric piano', 'the nameplate names the instrument');
+  assert.strictEqual(A.d.querySelector('#status .player').textContent, 'Electric piano', 'each other tab is a tag');
+  assert.strictEqual(picked(B.d), 'Electric piano', 'the fallboard shows the chosen instrument');
   A.d.getElementById('faster').click(); await sleep(50);
   assert.strictEqual(B.bpm(), '130', 'tempo is shared');
   A.d.getElementById('slower').click(); await sleep(50);
@@ -225,6 +229,7 @@ async function main() {
   await typeIn(B, 'qwe');
   await sleep(100);
   assert.strictEqual(A.status(), 'Other tab: Electric piano (ready)');
+  assert.ok(A.d.querySelector('#status .player.ready'), 'a ready tab\'s tag is marked ready');
   assert.strictEqual(A.played(), '', 'nothing plays before Enter');
   A.key('keydown', 'o'); await sleep(30);
   assert.ok(A.lit(67), 'live playing is immediate while parts wait');

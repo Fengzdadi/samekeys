@@ -20,7 +20,7 @@
     --brass-light: #D6B76F;
     --brass-deep: #765823;   /* pressed white keys: dark enough for an ivory label */
     --ink: #2B2823;
-    --ink-2: #6E6960;
+    --ink-2: #524D46;   /* secondary text: 4.5:1 or better on every room */
     --sans: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
     --serif: "Bodoni Moda", "Bodoni 72", Didot, "Playfair Display", Georgia, serif;
   }
@@ -37,15 +37,25 @@
   }
 
   /* the whole instrument is the main content, so tools that read "main" read all of it */
-  .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-
-  /* top: how to play, controls */
-  .top {
-    display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
-    padding: 20px 28px 0;
+  .stage {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+    background: linear-gradient(var(--room-top), var(--room));
   }
-  .how { margin: 0; max-width: 72ch; color: var(--ink-2); font-size: 13px; }
-  .how b { font-weight: 500; color: var(--ink); }
+
+  /* top: how to play as a key legend, and the playing controls. The instruments are on the fallboard. */
+  .top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 32px;
+    padding: 14px 28px 0;
+  }
+  .how { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.5; }
+  .how > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin-bottom: 6px; }
+  .how > span[hidden] { display: none; }
+  .how i { font-style: normal; white-space: nowrap; }
+  kbd {
+    display: inline-block; min-width: 18px; margin-right: 3px; padding: 0 5px; text-align: center;
+    font: inherit; font-size: 11.5px; line-height: 17px; color: var(--ink);
+    background: rgba(255,255,255,.45); border: 1px solid rgba(43,40,35,.28); border-bottom-width: 2px; border-radius: 4px;
+  }
   .controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .controls button, .group button {
     font: inherit; font-size: 13px; color: var(--ink);
@@ -55,13 +65,19 @@
   .controls button:hover { background: rgba(43,40,35,.06); }
   .controls button[aria-pressed="true"] { background: rgba(43,40,35,.10); border-color: rgba(43,40,35,.18); }
   .group { display: inline-flex; align-items: center; gap: 2px; margin-left: 8px; color: var(--ink-2); font-size: 13px; }
-  .group:first-child { margin: 0 8px 0 0; }
   .group button { padding: 3px 9px; }
   .group output { min-width: 3ch; text-align: center; color: var(--ink); font-variant-numeric: tabular-nums; }
   button:focus-visible, .key:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
   /* the wall: traces rise, played notes read out */
-  .wall { position: relative; flex: 1; min-height: 80px; }
+  .wall { position: relative; flex: 1; min-height: 72px; }
+  /* the ensemble: other tabs of the page, one tag each; later, the players on a shared stage */
+  .status { position: absolute; left: 28px; right: 28px; top: 14px; margin: 0; font-size: 12.5px; color: var(--ink-2); }
+  .status .player {
+    display: inline-block; padding: 1px 9px; border: 1px solid rgba(43,40,35,.22); border-radius: 999px;
+    color: var(--ink);
+  }
+  .status .player.ready { background: var(--brass-light); border-color: var(--brass); }
   .traces { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
   .trace {
     position: absolute; bottom: 0; width: 2px; border-radius: 1px;
@@ -70,25 +86,25 @@
   }
   @keyframes rise { to { transform: translateY(-46vh); opacity: 0; } }
   .played {
-    position: absolute; left: 28px; right: 28px; bottom: 12px; margin: 0;
-    font-size: 14px; white-space: pre; overflow: hidden; text-overflow: ellipsis;
+    position: absolute; left: 28px; right: 28px; bottom: 14px; margin: 0;
+    font-size: 20px; line-height: 1.3; white-space: pre; overflow: hidden; text-overflow: ellipsis;
     font-variant-numeric: tabular-nums; letter-spacing: .02em;
   }
   .played .queue { color: rgba(43,40,35,.72); }
   .played .held { color: var(--ink); }
   .played .held b { font-weight: 500; }
 
-  /* fallboard: lacquer, felt, nameplate */
   /* Materials. Every instrument draws from these tokens; the piano is the default. Only colours,
      faces and decoration change between instruments: key buttons keep the same boxes, so a click
      that lands on C4 lands on C4 whatever is playing. */
   .stage {
+    --room-top: var(--wall-top); --room: var(--wall);   /* the wall behind the instrument */
     --band: linear-gradient(#2A2620, #14110E 45%, #0F0D0A);
     --band-pad: 0px;
     --band-line: var(--felt);
-    --plate: var(--brass-light); --plate-font: var(--serif); --plate-size: 21px; --plate-spacing: .08em; --plate-case: none;
+    --plate: var(--brass-light); --plate-dim: #A8916A;   /* the chosen instrument's name, and the others' */
+    --plate-font: var(--serif); --plate-size: 19px; --plate-dim-size: 14px; --plate-spacing: .08em; --plate-case: none;
     --plate-shadow: 0 1px 0 rgba(0,0,0,.6);
-    --status-color: rgba(214,183,111,.7);
     --well: var(--lacquer);           /* between and below the keys */
     --slip: none;                     /* the strip under the keys */
     --slip-mask: none; --slip-clip: none;
@@ -107,13 +123,14 @@
   }
   /* Electric piano: black tolex, a brushed aluminium name rail, square plastic keys. */
   .stage[data-instrument="epiano"] {
+    --room-top: #E6E7E8; --room: #D0D3D5;
     --band: repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 1px, rgba(0,0,0,.03) 1px 3px) 0 16px / 100% 100% no-repeat,
             linear-gradient(#D3D6D8, #B4B8BB 45%, #9DA1A5) 0 16px / 100% 100% no-repeat,
             linear-gradient(#1D1D1D, #111);
     --band-pad: 16px;
-    --plate: #161616; --plate-font: var(--sans); --plate-size: 13px; --plate-spacing: .32em; --plate-case: uppercase;
+    --plate: #161616; --plate-dim: #3A3D40;
+    --plate-font: var(--sans); --plate-size: 13px; --plate-dim-size: 11px; --plate-spacing: .24em; --plate-case: uppercase;
     --plate-shadow: 0 1px 0 rgba(255,255,255,.35);
-    --status-color: var(--ink);
     --well: #0E0E0E;
     --slip: linear-gradient(#1A1A1A, #0B0B0B);
     --natural: linear-gradient(#F6F4EF, #F1EFE9 80%, #E4E1DA);
@@ -128,10 +145,10 @@
      A bar is drawn inside its button: bars narrow and shorten up the range (--g runs 0..1 from C2 to C7),
      and the naturals sit below the row of accidentals, so no bar is drawn under another key's button. */
   .stage[data-instrument="marimba"] {
+    --room-top: #EFE8DB; --room: #DDD2BF;
     --band: linear-gradient(#2E241F, #1B1512);
     --band-line: #0E0B09;
-    --plate: var(--ivory);
-    --status-color: rgba(247,242,231,.75);
+    --plate: var(--ivory); --plate-dim: #A8957F;
     --well: #16110F;
     --slip: linear-gradient(90deg, rgba(0,0,0,.4) 27%, rgba(255,255,255,.3) 45%, rgba(0,0,0,.4) 73%) 0 0 / calc(100% / 36) 100% repeat-x,
             linear-gradient(#9A8458, #6F5C3A);
@@ -159,12 +176,12 @@
   /* Harpsichord, French style: reversed keys (ebony naturals, bone sharps) with arcaded fronts, a painted
      green case with gilt bands. Ebony keys would vanish into the dark well, so each has a pale seam. */
   .stage[data-instrument="harpsichord"] {
+    --room-top: #E7E9E1; --room: #D3D8CC;
     --band: linear-gradient(#C9A24E, #C9A24E) 0 6px / 100% 2px no-repeat,
             linear-gradient(#C9A24E, #C9A24E) 0 calc(100% - 6px) / 100% 2px no-repeat,
             linear-gradient(#46644C, #3F5B45 50%, #324A38);
     --band-line: #C9A24E;
-    --plate: var(--ivory);
-    --status-color: rgba(247,242,231,.8);
+    --plate: var(--ivory); --plate-dim: #C4CEC0;
     --well: #16120F;
     --slip: linear-gradient(#C9A24E, #C9A24E) 0 2px / 100% 1px no-repeat, linear-gradient(#3F5B45, #2C4031);
     --natural: radial-gradient(circle at 50% 100%, transparent 3px, #B98A55 3px 4px, transparent 4.5px) 50% 100% / 9px 6px repeat-x,
@@ -185,10 +202,11 @@
   /* Organ: a cherry cabinet with a row of drawbars (a picture of the registration the sound uses, not
      a control), flat-fronted waterfall keys. */
   .stage[data-instrument="organ"] {
+    --room-top: #EFE6DF; --room: #DDD0C6;
     --band: repeating-linear-gradient(90deg, rgba(0,0,0,.06) 0 2px, transparent 2px 9px, rgba(255,255,255,.03) 9px 11px, transparent 11px 17px),
             linear-gradient(#8A3F2A, #7A3423 50%, #5E2619);
     --band-line: #3A160E;
-    --status-color: rgba(247,242,231,.8);
+    --plate: var(--ivory); --plate-dim: #D9BBA8;
     --drawbars: flex;
     --well: #1B0F0B;
     --slip: linear-gradient(#7A3423, #4E1F14);
@@ -204,12 +222,14 @@
      naturals and blued sharps interleaved, shortening up the range; a crank turns the cylinder. The
      natural teeth are narrow enough to stay clear of the sharps' buttons. */
   .stage[data-instrument="musicbox"] {
-    --band: radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 0 3px / 23px 11px,
-            radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 9px 8px / 31px 13px,
+    --room-top: #F1E8E5; --room: #E0D2CD;
+    --band: radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 0 5px / 23px 4px repeat-x,
+            radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 9px 11px / 31px 4px repeat-x,
+            radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 4px calc(100% - 13px) / 27px 4px repeat-x,
+            radial-gradient(circle, #6E5528 0 1px, transparent 1.6px) 15px calc(100% - 6px) / 19px 4px repeat-x,
             linear-gradient(#7E6536, #C9AE6E 30%, #E2CB8E 45%, #B89A5A 70%, #6F5731);
     --band-line: #9AA0A6;
-    --plate: var(--ink); --plate-shadow: 0 1px 0 rgba(255,255,255,.35);
-    --status-color: var(--ink);
+    --plate: var(--ink); --plate-dim: #4A381E; --plate-shadow: 0 1px 0 rgba(255,255,255,.35);
     --crank: block;
     --well: linear-gradient(#4A2C1E, #3C2317);
     --slip: linear-gradient(#3F2519, #2C190F);
@@ -240,21 +260,32 @@
   }
   .stage[data-instrument="musicbox"] .key.white.on .lab { background: var(--natural-press); }
 
-  /* fallboard: lacquer, felt, nameplate */
+  /* fallboard: lacquer, felt, the instruments' names */
   .fallboard {
     position: relative; height: 58px; flex-shrink: 0; padding-top: var(--band-pad);
     background: var(--band);
     border-bottom: 3px solid var(--band-line);
     display: flex; align-items: center; justify-content: center;
   }
-  .nameplate {
-    font-family: var(--plate-font); font-weight: 500; font-size: var(--plate-size); letter-spacing: var(--plate-spacing);
-    text-transform: var(--plate-case); color: var(--plate); text-shadow: var(--plate-shadow);
+  /* the instruments' names, engraved on the fallboard: the chosen one is larger, brighter and underlined */
+  .instruments {
+    display: flex; align-items: center; gap: 4px; max-width: 100%; padding: 0 16px;
+    overflow-x: auto; scrollbar-width: none;
   }
-  .status { position: absolute; right: 28px; font-size: 12px; color: var(--status-color); }
+  .instruments button {
+    flex-shrink: 0; padding: 4px 8px; cursor: pointer; background: none; border: 0;
+    font-family: var(--plate-font); font-weight: 500; font-size: var(--plate-dim-size); letter-spacing: var(--plate-spacing);
+    text-transform: var(--plate-case); white-space: nowrap; color: var(--plate-dim); text-shadow: var(--plate-shadow);
+  }
+  .instruments button:hover { color: var(--plate); }
+  .instruments button[aria-pressed="true"] {
+    font-size: var(--plate-size); color: var(--plate);
+    text-decoration: underline 1px; text-underline-offset: 5px;
+  }
+  @media (max-width: 900px) { .drawbars, .crank { display: none; } }
   .drawbars {
     display: var(--drawbars, none); gap: 5px; align-items: flex-start;
-    position: absolute; left: 28px; top: 0; padding-top: 5px;
+    position: absolute; right: 28px; top: 0; padding-top: 5px;
     background: linear-gradient(#1A0C07, #1A0C07) 0 0 / 100% 5px no-repeat;
   }
   .drawbars i {
@@ -262,7 +293,7 @@
     border: 1px solid rgba(247,242,231,.45); border-top: 0; border-radius: 0 0 2px 2px;
   }
   .crank {   /* axle on the cylinder, an arm, a wooden knob */
-    display: var(--crank, none); position: absolute; left: 22px; top: 8px; width: 14px; height: 14px;
+    display: var(--crank, none); position: absolute; right: 34px; top: 8px; width: 14px; height: 14px;
     border-radius: 50%; background: radial-gradient(#E5D3A0, #8C7240); box-shadow: 0 0 0 2px #5A4526;
     transform: rotate(28deg); transform-origin: 7px 7px;
   }
@@ -276,7 +307,7 @@
     padding-bottom: 16px; background: var(--well);
   }
   .keys {
-    position: relative; display: flex; height: clamp(170px, 30vh, 290px); min-width: 760px;
+    position: relative; display: flex; height: clamp(190px, 46vh, 420px); min-width: 760px;
     padding: 0 6px 12px; user-select: none; -webkit-user-select: none;
   }
   .keys::after {   /* the strip under the keys: a key slip, or the marimba's resonators */
@@ -337,9 +368,11 @@
   .gate p { margin: 0; font-size: 13px; color: var(--ink-2); }
 
   @media (max-width: 720px) {
-    .top { flex-direction: column; gap: 10px; padding: 14px 16px 0; }
-    .played { left: 16px; right: 16px; }
-    .status { right: 16px; }
+    .top { padding: 10px 16px 0; }
+    .top { flex-direction: column; }
+    .controls { margin-left: -11px; }
+    .played { left: 16px; right: 16px; font-size: 17px; }
+    .status { left: 16px; right: 16px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .trace { display: none; }
@@ -352,21 +385,32 @@
 
 <header class="top">
   <p class="how">
-    <b>1–0 q–p a–l z–m</b> are the natural keys from C2, <b>t</b> is middle C, <b>Shift</b> adds a sharp, hold <b>Space</b> to sustain.<br>
-    Type fast (keys under 70 ms apart) to play in time: space is a rest, <b>[ ]</b> a chord, <b>-</b> a hold.
-    <span id="together-how" hidden><br>With another tab open, typed music waits and shows as “ready”: <b>Enter</b> counts everyone in, <b>Esc</b> stops everyone, <b>Backspace</b> clears only this tab’s part.</span>
+    <span>
+      <i><kbd>1–0</kbd><kbd>q–p</kbd><kbd>a–l</kbd><kbd>z–m</kbd> are the natural keys from C2</i>
+      <i><kbd>t</kbd> is middle C</i>
+      <i><kbd>Shift</kbd> adds a sharp</i>
+      <i>hold <kbd>Space</kbd> to sustain</i>
+    </span>
+    <span>
+      <i>Type fast (keys under 70 ms apart) to play in time:</i>
+      <i><kbd>space</kbd> is a rest</i>
+      <i><kbd>[ ]</kbd> a chord</i>
+      <i><kbd>-</kbd> a hold</i>
+    </span>
+    <span id="together-how" hidden>
+      <i>With another tab open, typed music waits and shows as “ready”:</i>
+      <i><kbd>Enter</kbd> counts everyone in</i>
+      <i><kbd>Esc</kbd> stops everyone</i>
+      <i><kbd>Backspace</kbd> clears only this tab’s part</i>
+    </span>
   </p>
   <div class="controls">
-    <div class="group">
-      <span>Instrument</span>
-      <button type="button" id="instrument" aria-label="Instrument: Piano">Piano</button>
-    </div>
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
     <button type="button" id="labels" aria-pressed="true">Labels</button>
-    <div class="group">
-      <span>Tempo</span>
-      <button type="button" id="slower" aria-label="Slower">−</button>
+    <div class="group" role="group" aria-label="Tempo">
+      <span aria-hidden="true">♩ =</span>
       <output id="bpm">120</output>
+      <button type="button" id="slower" aria-label="Slower">−</button>
       <button type="button" id="faster" aria-label="Faster">+</button>
     </div>
   </div>
@@ -374,14 +418,14 @@
 
 <div class="wall" id="wall">
   <div class="traces" id="traces" aria-hidden="true"></div>
+  <p class="status" id="status" role="status"></p>
   <p class="played"><span id="played" aria-live="polite"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
 </div>
 
 <div class="fallboard">
   <span class="drawbars" id="drawbars" aria-hidden="true"></span>
   <span class="crank" aria-hidden="true"></span>
-  <span class="nameplate" id="nameplate">Piano</span>
-  <span class="status" id="status"></span>
+  <div class="instruments" id="instruments" role="group" aria-label="Instrument"></div>
 </div>
 
 <div class="keys-wrap">
@@ -411,7 +455,6 @@
   const noteName = m => NAMES[m % 12] + (Math.floor(m / 12) - 1);
 
   document.title = SITE_NAME;
-  document.getElementById('nameplate').textContent = SITE_NAME;
 
   /* ---------- key map: letter -> midi ---------- */
   const charToMidi = new Map();
@@ -1055,22 +1098,32 @@
   });
 
   /* ---------- controls ---------- */
-  const instrumentBtn = document.getElementById('instrument');
-  // The nameplate, the keyboard's group label and the materials all follow the instrument.
+  // Every instrument is a visible button, so a person or an agent sees all six and picks one.
+  // The keyboard's group label and the materials follow the choice.
+  const instrumentsEl = document.getElementById('instruments');
   function showInstrument() {
-    document.getElementById('nameplate').textContent = instrument.name;
     document.querySelector('.stage').dataset.instrument = instrument.id;
     keysEl.setAttribute('aria-label', instrument.name + ' keys');
+    for (const b of instrumentsEl.children) {
+      b.setAttribute('aria-pressed', String(b.dataset.id === instrument.id));
+      // on a narrow screen the names scroll inside the fallboard: keep the chosen one in view
+      if (b.dataset.id === instrument.id && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
   }
-  showInstrument();
-  instrumentBtn.addEventListener('click', () => {
-    instrument = INSTRUMENTS[(INSTRUMENTS.indexOf(instrument) + 1) % INSTRUMENTS.length];
-    instrumentBtn.textContent = instrument.name;
-    instrumentBtn.setAttribute('aria-label', 'Instrument: ' + instrument.name);
-    showInstrument();
-    instrumentBtn.blur();
-    send('here');
+  INSTRUMENTS.forEach(inst => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.id = inst.id;
+    b.textContent = inst.name;
+    b.addEventListener('click', () => {
+      instrument = inst;
+      showInstrument();
+      b.blur();
+      send('here');
+    });
+    instrumentsEl.appendChild(b);
   });
+  showInstrument();
   const sustainBtn = document.getElementById('sustain');
   function updatePedalUI() { sustainBtn.setAttribute('aria-pressed', String(pedalOn())); }
   sustainBtn.addEventListener('click', () => {
@@ -1124,11 +1177,24 @@
   function send(type, extra) {
     if (channel) channel.postMessage({ type, id: me, instrument: instrument.id, bpm, ready: held.length > 0, ...extra });
   }
+  // Reads as one line of text ("Other tabs: Organ, Piano (ready)"); each other tab is also a tag,
+  // the seed of a stage where every player shows up.
   function renderStatus() {
-    const others = [...peers.values()].map(p =>
-      (INSTRUMENTS.find(i => i.id === p.instrument) || INSTRUMENTS[0]).name + (p.ready ? ' (ready)' : ''));
-    const withText = others.length ? (others.length === 1 ? 'Other tab: ' : 'Other tabs: ') + others.join(', ') : '';
-    statusEl.textContent = [countText && 'Count-in ' + countText, fallbackNote, withText].filter(Boolean).join(' · ');
+    const parts = [countText && 'Count-in ' + countText, fallbackNote].filter(Boolean);
+    const others = [...peers.values()];
+    if (others.length) {
+      const line = document.createDocumentFragment();
+      line.append(others.length === 1 ? 'Other tab: ' : 'Other tabs: ');
+      others.forEach((p, i) => {
+        if (i) line.append(', ');
+        const tag = document.createElement('span');
+        tag.className = 'player' + (p.ready ? ' ready' : '');
+        tag.textContent = (INSTRUMENTS.find(x => x.id === p.instrument) || INSTRUMENTS[0]).name + (p.ready ? ' (ready)' : '');
+        line.append(tag);
+      });
+      parts.push(line);
+    }
+    statusEl.replaceChildren(...parts.flatMap((part, i) => i ? [' · ', part] : [part]));
     togetherHow.hidden = !together();
   }
   // Wall-clock seconds minus audio-clock seconds, measured at the speaker when the browser can tell.
