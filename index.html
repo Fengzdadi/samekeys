@@ -3,7 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Piano</title>
+<title>Same Keys</title>
+<meta name="description" content="Six instruments on the same keys, one web page. Play it with your keyboard, or let your AI agent play along.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fengzdadi.github.io/samekeys/">
+<meta property="og:title" content="Same Keys">
+<meta property="og:description" content="Six instruments on the same keys, one web page. Play it with your keyboard, or let your AI agent play along.">
+<meta property="og:image" content="https://fengzdadi.github.io/samekeys/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Same Keys: a row of ivory and ebony keys under a black fallboard engraved with six instrument names.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2314110E'/%3E%3Crect x='4' y='8' width='24' height='2' fill='%237D2F36'/%3E%3Crect x='5' y='10' width='10.5' height='17' rx='1.5' fill='%23F7F2E7'/%3E%3Crect x='16.5' y='10' width='10.5' height='17' rx='1.5' fill='%23F7F2E7'/%3E%3Crect x='12' y='10' width='8' height='10' rx='1' fill='%231C1A18'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400..700&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
@@ -490,6 +501,17 @@
     .top { padding: 10px 16px 0; }
     .top { flex-direction: column; }
     .controls { margin-left: -11px; }
+    /* the legend and the controls keep every word, one row each, scrolled sideways; the rows fade
+       at the right edge so the rest reads as there */
+    .how { font-size: 12px; }
+    .how > span, .controls, .instruments {
+      flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%;
+      -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+      mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+    }
+    .how > span::-webkit-scrollbar, .controls::-webkit-scrollbar, .instruments::-webkit-scrollbar { display: none; }
+    .how > span::after, .controls::after, .instruments::after { content: ""; flex: 0 0 20px; }
+    .top { gap: 2px; align-items: stretch; }
     .wall { padding: 12px 16px; }
     .played { font-size: 17px; }
   }
@@ -579,7 +601,7 @@
 
 <script>
 (() => {
-  const SITE_NAME = 'Piano';
+  const SITE_NAME = 'Same Keys';
   const SAMPLE_HOSTS = [
     'https://tonejs.github.io/audio/salamander/',
     'https://raw.githubusercontent.com/Tonejs/audio/master/salamander/'
@@ -637,6 +659,11 @@
     b.style.left = `calc(6px + (100% - 12px) * ${((i + 1) * ww - bw / 2) / 100})`;
     b.style.width = `calc((100% - 12px) * ${bw / 100})`;
     keysEl.appendChild(b);
+  }
+  // A screen narrower than the keyboard starts with middle C in view, a third of the way in, not at C2.
+  const keysWrap = keysEl.parentElement;
+  if (keysWrap.scrollWidth > keysWrap.clientWidth) {
+    keysWrap.scrollLeft = keyEls.get(60).getBoundingClientRect().left - keysEl.getBoundingClientRect().left - keysWrap.clientWidth / 3;
   }
 
   /* ---------- audio ---------- */
