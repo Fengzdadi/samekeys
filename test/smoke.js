@@ -6,6 +6,8 @@ const assert = require('assert');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+// the page's songbook, read from its source
+const SONGBOOK = new Function('return ' + html.match(/const SONGBOOK = (\[[\s\S]*?\n  \]);/)[1])();
 let clipboard = '';   // what the page last copied
 // Recording: whether the browser can write MP4, whether the person shares the tab's picture, and the
 // names of the files the page saved.
@@ -290,31 +292,32 @@ async function main() {
   assert.strictEqual(d.querySelector('.stage').dataset.instrument, 'piano');
   assert.strictEqual(d.getElementById('status').textContent, 'Alone here · open this page in another tab to play together', 'alone: the ensemble line\'s empty state');
 
-  // The agent prompt: an ensemble in one paste. It is the README's text, it names what is really on the
-  // page, and every part in it plays the notes it should.
+  // The agent prompt is a player's: this tab's instrument, its part in every piece of the songbook, or a
+  // lead sheet to write its own. The README carries the piano's, word for word, and every part.
   const promptBtn = d.getElementById('agent-prompt');
   promptBtn.click(); await sleep(0);
   assert.ok(promptBtn.textContent.startsWith('Copied'), 'the button says it copied');
+  assert.ok(clipboard.startsWith('You are the Piano player in an ensemble'), 'the prompt is for this tab\'s instrument');
   assert.ok(readme.includes(clipboard.replace('http://localhost/', 'https://fengzdadi.github.io/samekeys/')),
-    'the README carries the same prompt');
+    'the README carries the piano\'s prompt');
   assert.strictEqual(d.getElementById('played').getAttribute('aria-label'), 'Played notes', 'the played line has a name tools can find');
   for (const words of ['Open the piano', 'Ready, waiting for Enter', 'Played notes'])
     assert.ok(clipboard.includes('"' + words + '"') && html.includes(words), 'the prompt quotes "' + words + '" as the page says it');
-  const parts = [
-    ['Organ', 'C3———  F2———  G2———  C3———'],
-    ['Harpsichord', '[C3 E3 G3]—  [C3 E3 G3]—  [C3 F3 A3]—  [C3 F3 A3]—  [B2 D3 G3]—  [B2 D3 G3]—  [C3 E3 G3]———'],
-    ['Marimba', 'C4  E4  G4  E4  C4  F4  A4  F4  B3  D4  G4  D4  C4———'],
-    ['Music box', 'E5  D5  C5  D5  F5—  A5—  G5  F5  E5  D5  C5———'],
-    ['Piano', 'E4  D4  C4  D4  F4—  A4—  G4  F4  E4  D4  C4———'],
-    ['Electric piano', '[C4 E4 G4]—  [C4 E4 G4]—  [C4 F4 A4]—  [C4 F4 A4]—  [B3 D4 G4]—  [B3 D4 G4]—  [C4 E4 G4]———'],
-  ];
-  for (const [name, notes] of parts) {
-    const part = clipboard.match(new RegExp('\\b' + name + ': ([^\\s,)]+)'))[1];
-    pick(d, name);
-    await typeString(part); await sleep(4500);
-    assert.ok(played().endsWith(notes), name + '\'s part in the prompt plays ' + notes + ', got ' + played().slice(-80));
+  const slotsOf = part => part.match(/\[[^\]]*\]|./g).length;
+  const shown = part => { const r = part.length - part.trimStart().length; return r ? `(first press space ${r} times, ${r / 4} s of rest) ${part.trimStart()}` : part; };
+  for (const piece of SONGBOOK) {
+    const lengths = Object.values(piece.parts).map(slotsOf);
+    assert.ok(lengths.every(n => n === lengths[0]), piece.title + ': every part is the same length, ' + lengths);
+    for (const [id, part] of Object.entries(piece.parts)) {
+      assert.ok(/^[1-9a-z0 \-\[\]]+$/.test(part), piece.title + ' ' + id + ': only the page\'s notation');
+      assert.ok(readme.includes(': ' + shown(part) + '\n'), piece.title + ' ' + id + ' is in the README\'s songbook');
+    }
+    assert.ok(clipboard.includes('- ' + piece.title + ' ('), 'the piano\'s prompt names ' + piece.title);
   }
+  // a whole piece from the songbook, played alone: Twinkle Twinkle's piano part ends on its held chord
   pick(d, 'Piano');
+  await typeString(SONGBOOK.find(p => p.title === 'Twinkle Twinkle').parts.piano); await sleep(56000);
+  assert.ok(played().endsWith('[C4 E4 G4]' + '—'.repeat(15)), 'Twinkle Twinkle\'s piano part plays to its last chord');
   await sleep(2500);
   assert.strictEqual(promptBtn.textContent, 'Copy agent prompt', 'and goes back to its name');
 
@@ -433,6 +436,27 @@ async function main() {
   await typeIn(A, 'tyu'); await sleep(40);   // well before D4 is due (250 ms)
   assert.ok(A.played().endsWith('C4'), 'alone, a typed phrase starts at once');
 
+  // Every part in the songbook goes in exactly as written: pressed into a tab with another open, it
+  // waits, character for character, rests and chords and all.
+  {
+    const names = { piano: 'Piano', epiano: 'Electric piano', harpsichord: 'Harpsichord', organ: 'Organ', marimba: 'Marimba', musicbox: 'Music box' };
+    const Q = tab(load({ room: 'book' })), R = tab(load({ room: 'book' }));
+    Q.d.getElementById('open').click(); R.d.getElementById('open').click(); await sleep(200);
+    assert.strictEqual(Q.d.getElementById('status').getAttribute('aria-label'), Q.status(),
+      'the ensemble line carries its whole sentence as a name, player tags and all');
+    assert.ok(!Q.d.getElementById('hint').hidden, 'nothing played or waiting yet: the hint shows');
+    let parts = 0;
+    for (const piece of SONGBOOK) for (const [id, part] of Object.entries(piece.parts)) {
+      pick(Q.d, names[id]); await sleep(20);
+      await typeIn(Q, part); await sleep(50);
+      assert.strictEqual(Q.held(), '   Ready, waiting for Enter: ' + part, piece.title + ', ' + names[id] + ': the part waits as written');
+      assert.ok(Q.d.getElementById('hint').hidden, 'a waiting part clears the hint, so the two don\'t overlap');
+      Q.key('keydown', 'Backspace', 'Backspace'); await sleep(20);
+      parts++;
+    }
+    assert.strictEqual(parts, 22, 'six parts each for Canon, Ode to Joy and Twinkle, four for Four Agents');
+  }
+
   // --- a stage: one tab shows and plays every player; the players go quiet and send it their notes ---
   const P1 = tab(load({ room: 'hall' })), P2 = tab(load({ room: 'hall' })), S = tab(load({ room: 'hall' }));
   for (const t of [P1, P2, S]) t.d.getElementById('open').click();
@@ -448,13 +472,15 @@ async function main() {
   assert.ok(stripOf('piano') && stripOf('marimba'), 'each strip takes its player\'s instrument');
   assert.strictEqual(stripOf('marimba').querySelectorAll('.key').length, 61, 'a strip is the whole keyboard');
   assert.strictEqual(stripOf('marimba').getAttribute('aria-label'), 'Marimba');
+  assert.deepStrictEqual([...S.d.querySelectorAll('.strip')].map(e => e.dataset.instrument), ['marimba', 'piano'],
+    'strips are in score order, high instruments on top, whoever joined first');
   assert.strictEqual(P1.status(), 'Stage is open: sound comes from the stage · Other tab: Marimba',
     'a player learns where the sound went, and still sees the other player, not the stage');
 
   // two players of the same instrument are numbered, and every tab agrees on the names
   pick(P1.d, 'Marimba'); await sleep(50);
-  assert.deepStrictEqual([...S.d.querySelectorAll('.strip-name')].map(n => n.textContent), ['Marimba 2', 'Marimba'],
-    'the stage tells the two marimbas apart');
+  assert.deepStrictEqual([...S.d.querySelectorAll('.strip-name')].map(n => n.textContent), ['Marimba', 'Marimba 2'],
+    'the stage tells the two marimbas apart, in number order');
   assert.strictEqual(P1.d.title, 'Marimba 2', 'the newcomer takes the next number');
   assert.strictEqual(P1.status(), 'Stage is open: sound comes from the stage · You are Marimba 2 · Other tab: Marimba',
     'and says which one it is');

@@ -962,6 +962,7 @@
     const now = ctx ? ctx.currentTime : 0;
     typing.pending = typing.pending.filter(p => p.when > now);
     queueEl.textContent = typing.pending.length ? '   ' + typing.pending.map(p => p.ch).join('') : '';
+    if (typing.pending.length || held.length) hintEl.hidden = true;   // a part on its way fills the place too
     heldEl.innerHTML = '';
     if (held.length) {
       const label = document.createElement('b');
@@ -1222,38 +1223,76 @@
     instrumentsEl.appendChild(b);
   });
   showInstrument();
-  // A prompt a person pastes to their own agent to play an ensemble: one tab per instrument, parts loaded
-  // one at a time, one Enter to start. Plain instructions for playing the page the way a person does; one
-  // agent can do it alone, or hand each instrument to a helper. Every example part fits the same C, F, G, C
-  // progression, so any mix of tabs sounds together. README.md carries the same text.
-  const EXAMPLE_PARTS = {
-    organ: '8---4---5---8---', harpsichord: '[80w]-[80w]-[8qe]-[8qe]-[79w]-[79w]-[80w]---',
-    marimba: 'tuoutipiryoyt---', musicbox: 'fdsdg-j-hgfds---',
-    piano: 'uytyi-p-oiuyt---', epiano: '[tuo]-[tuo]-[tip]-[tip]-[ryo]-[ryo]-[tuo]---',
+  // The songbook: whole pieces, one part per instrument, all at tempo 120, every part of a piece the same
+  // length, so any set of tabs lines up. Canon, Ode to Joy and Twinkle are arranged for these six
+  // instruments; Four Agents is as its four AI players wrote it, for the four they played. README.md lists
+  // them all.
+  const SONGBOOK = [
+    { title: "Canon in C", about: "Pachelbel; a ground bass under a canon of four voices, 2 min", parts: {
+      piano: "[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[8wtu]---------------",
+      epiano: "                                                                                                u---y---t---r---e---w---e---r---t---r---e---w---q---0---q---9---8-0-w-q-0-8-0-9-8-6-8-w-q-e-w-q-0-8-9-r-t-u-o-w-e-q-w-0-8-t-t-r-uytyyrwrte0erw0weq8qw080etipoiyrtyutrtyrertewerwqweq0qw0qetiwryif---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---u---y---t---r---e---w---e---r---t---r---e---w---q---0---q---9---8-0-w-q-0-8-0-9-8-6-8-w-q-e-w-q-t---------------",
+      harpsichord: "f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgx---z---l---k---j---h---j---k---l---k---j---h---g---f---g---d---f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgs---------------",
+      organ: "8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---[18]---------------",
+      marimba: "                                f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgx---z---l---k---j---h---j---k---l---k---j---h---g---f---g---d---f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdao---------------",
+      musicbox: "                                                                f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgx---z---l---k---j---h---j---k---l---k---j---h---g---f---g---d---f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-u---------------",
+    } },
+    { title: "Four Agents", about: "written by four AI agents, each alone, from one lead sheet, 2 min", parts: {
+      harpsichord: "                                [wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-8w0wwyryeutu0rwrqtet8w0wqtetwyry8w0wwyryeutu0rwrqtet8w0wqtetwyry8wtuwryoetup0wruqeti8wtuqetiwryo8wtuwryoetup0wruqeti8wtuqetiwryo[wtu] [wtu][wtu][wry] [wry][wry][etu] [etu][etu][wru] [wru][wru][eti] [eti][eti][wtu] [wtu][wtu][eti] [eti][eti][wry] [wry][wry][wtu] [wtu][wtu][wry] [wry][wry][etu] [etu][etu][wru] [wru][wru][eti] [eti][eti][wtu] [wtu][wtu][eti] [eti][eti][wry] [wry][wry][8w]tuo[wr]yoa[et]ups[0w]rua[qe]tip[8w]tuo[qe]tip[wr]yoa[8w]tuo[wr]yoa[et]ups[0w]rua[qe]tip[8w]tuo[qe]tip[wr]yoa[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[8wu]---------------",
+      organ: "                                8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8--55--26--33--74--81--54--85--78--55--26--33--74--81--54--85--78-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8---5---6---3---4---1---4---5---[18]---------------",
+      marimba: "                                                                s---a---p---o---i---u---p---a---s---a---p---o---i---u---p---a-sds-dsa-sap-apo-poi-oiu-iop-opa-sds-dsa-sap-apo---i-oiu-iop-opa-sdf-gfd-fds-dsa-dfg-hgf-d-s-asd-fgf-hfd-fds-dsa-dfg-hgf-d-s-asd-fgh-gfd-a-s-dfh-gfg-sdf-ghg-fda-sdfghfdfdasdfsasdfgfsdf---g-fda-sds-dsa-sap-apo-poi-oiu-iop-opa-sd[us]---[ya]---[tp]---[uo]---[ip]---[us]---[ps]---[ad]---s-dsa---p-apo---i-oiu---p-opa---s---a---p---o---i---u---i---y---u---------------",
+      musicbox: "f-h-d---s-f-h---j-h-f---g-f-d---f-h-d---s-f-h---j-h-f---g-f-d---f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-h-d---s-f-h---j-h-f---g-f-d---l---k-h-j---h-k-l-j-h---j-g-k---l-kjk-jhj-ljk-hfg-jll-hfg-jgh-d-f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-  d-  s-  h-  j-  f-  g-  d-  f-h-d---s-f-h---j-h-f---g-f-d---f-ghd-fds-dfh-gfj-kjh-f-g-fdd---l---k-h-j---h-k-l-j-h---j-g-k---l-kjk-jhj-ljk-hfg-jll-hfg-jgh-d-f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-h-d---s-f-h---j-h-f---g-f-d---s---------------",
+    } },
+    { title: "Ode to Joy", about: "Beethoven; the whole theme, twice, 1 min", parts: {
+      piano: "u-u-i-o-o-i-u-y-t-t-y-u-u--yy---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---y-y-u-t-y-uiu-t-y-uiu-t-t-y-w---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---u-u-i-o-o-i-u-y-t-t-y-u-u--yy---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---y-y-u-t-y-uiu-t-y-uiu-t-t-y-w---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---[tuo]---------------",
+      epiano: "[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wt]---------------",
+      harpsichord: "                                                                                                                                [80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]---------------",
+      organ: "8---5---5---8---8---5---8---5---8---5---5---8---8---5---5---8---5---8---5---8---5---8---8---5---8---5---5---8---8---5---5---8---8-5-5-9-5-9-8-5-8-5-5-9-8-5-5-9-8-5-5-9-5-9-8-5-8-5-5-9-5-9-8-5-5-9-8-5-5-9-8-5-5-9-8-5-8-5-5-9-8-5-5-9-5-9-8-5-8-5-5-9-5-9-8-5-[18]---------------",
+      marimba: "                                                                                                                                0wtwrywyrywy0wtw0wtwrywy0wtwrywy0wtwrywyrywy0wtw0wtwrywyrywy0wtwrywy0wtwrywy0wtwrywy0wtw0wtwrywy0wtwrywyrywy0wtw0wtwrywyrywy0wtwt---------------",
+      musicbox: "                                                                                                                                f-f-g-h-h-g-f-d-s-s-d-f-f--dd---f-f-g-h-h-g-f-d-s-s-d-f-d--ss---d-d-f-s-d-fgf-s-d-fgf-s-s-d-o---f-f-g-h-h-g-f-d-s-s-d-f-d--ss---s---------------",
+    } },
+    { title: "Twinkle Twinkle", about: "all three verses, twice, 50 s", parts: {
+      piano: "t-t-o-o-p-p-o---i-i-u-u-y-y-t---o-o-i-i-u-u-y---o-o-i-i-u-u-y---t-t-o-o-p-p-o---i-i-u-u-y-y-t---8w0w8w0wqtet8w0wqtet8w0w7w9w8w0w8w0wqtet8w0w7w9w8w0wqtet8w0w7w9w8w0w8w0wqtet8w0wqtet8w0w7w9w8w0w[tuo]---------------",
+      epiano: "                                                                                                [wt]---[wt]---[et]---[wt]---[et]---[wt]---[wr]---[wt]---[wt]---[et]---[wt]---[wr]---[wt]---[et]---[wt]---[wr]---[wt]---[wt]---[et]---[wt]---[et]---[wt]---[wr]---[wt]---[wt]---------------",
+      harpsichord: "                                                                                                [80w]-[80w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]---------------",
+      organ: "8---8---4---8---4---8---5---8---8---4---8---5---8---4---8---5---8---8---4---8---4---8---5---8---8-8-8-8-4-4-8-8-4-4-8-8-5-5-8-8-8-8-4-4-8-8-5-5-8-8-4-4-8-8-5-5-8-8-8-8-4-4-8-8-4-4-8-8-5-5-8-8-[18]---------------",
+      marimba: "                                                                                                u---u---i---u---i---u---y---u---u---i---u---y---u---i---u---y---u---u---i---u---i---u---y---u---u---------------",
+      musicbox: "                                                                                                s-s-h-h-j-j-h---g-g-f-f-d-d-s---h-h-g-g-f-f-d---h-h-g-g-f-f-d---s-s-h-h-j-j-h---g-g-f-f-d-d-s---s---------------",
+    } },
+  ];
+
+  // Copy agent prompt: instructions a person pastes to their own agent, for the instrument chosen in this
+  // tab: its part in every piece, or a lead sheet to write its own. Each player, a person or an agent,
+  // takes one tab; one agent can also take several, one tab at a time. The agent still plays through the
+  // page like a person.
+  // A part that waits some rounds before it comes in starts with many spaces, which nobody can count in
+  // a line of text: say how many instead.
+  const showPart = part => {
+    const rests = part.length - part.trimStart().length;
+    return rests ? `(first press space ${rests} times, ${rests / 4} s of rest) ${part.trimStart()}` : part;
   };
   function agentPrompt() {
-    const part = id => `${INSTRUMENTS.find(i => i.id === id).name}: ${EXAMPLE_PARTS[id]}`;
-    return [
-      'Please play an ensemble on a web instrument, using the browser the way a person would.',
-      'Each instrument plays in its own browser tab; the tabs find each other and start together.',
+    const me = instrument, lines = [
+      `You are the ${me.name} player in an ensemble on a web instrument. Each player, a person or an AI agent, plays one instrument in its own browser tab; the tabs find each other and start together. Play through the page the way a person would.`,
       '',
       `Page: ${location.origin + location.pathname}`,
-      'Parts (two bars of C, F, G, C; each character is one key press):',
-      ...['organ', 'harpsichord', 'marimba', 'musicbox'].map(id => '- ' + part(id)),
-      `(${part('piano')}, ${part('epiano')})`,
       '',
-      '1. Open one tab per instrument and click "Open the piano" in each. Open them all before playing: a tab that is alone plays at once instead of waiting.',
-      '   Work in one tab at a time: bring it to the front and check that the "Open the piano" screen is gone before you click or press keys there. Clicks and key presses sent to a tab that is not in front can be lost.',
-      '2. In each tab, click the instrument\'s name on the dark band above the keys, then press its part\'s keys in one quick burst. The part waits: the line above the keys says "Ready, waiting for Enter".',
-      '3. When each of your tabs shows its part ready, press Enter in any one of them. Other tabs of the page that you did not open may be listed too; they don\'t need to be ready. All tabs count in and start together on the next bar. Esc in any tab stops everything.',
+      `1. Open the page and click "Open the piano", then click "${me.name}" in the row of instrument names on the dark band above the keys. Work in your own tab only, and bring it to the front before you click or press keys there: clicks and key presses sent to a tab that is not in front can be lost.`,
+      '2. Press your part for the piece I name (if I name none, the first below) in one quick burst. With other tabs of the page open, it waits: the line above the keys says "Ready, waiting for Enter". If yours is the only tab, it plays at once, so open another tab first.',
+      '3. Don\'t press Enter unless I ask you to start everyone: Enter in any tab counts everyone in, and every waiting part starts together on the next bar. Esc in any tab stops everything.',
       '',
-      'You can do the tabs one after another yourself. If you can start helper agents, you may give each instrument its own, but they share one browser: let them load their parts one at a time, and have one of them (or you) press Enter at the end.',
+      `Your parts, at tempo 120 (each character is one key press, one eighth note):`,
+      ...SONGBOOK.map(p => p.parts[me.id]
+        ? `- ${p.title} (${p.about}): ${showPart(p.parts[me.id])}`
+        : `- ${p.title} (${p.about}): no ${me.name} part; it is for ${INSTRUMENTS.filter(i => p.parts[i.id]).map(i => i.name.toLowerCase()).join(', ')}.`),
       '',
-      `Pressing keys: t is middle C, 1–0 q–p a–l z–m are the natural keys from C2 up, Shift plays a sharp, [ ] makes a chord, - holds. Press keys, don't type text: the page has no text box. With Claude in Chrome, send a part as one key action with the characters separated by spaces (e.g. "${[...EXAMPLE_PARTS.organ].join(' ')}"), using literal characters, not key names like "minus".`,
+      'Or write your own part over this lead sheet, two chords per bar, each 4 characters long: C G Am Em F C F G, 14 times, then a 16-character ending on a note of C major held with 15 "-", 464 characters in all. Say so to the other players, so every part is the same length.',
       '',
-      'Only want one instrument? Play just its part in a single tab.',
-      'Tell me what each tab\'s "Played notes" line, just above the keys, said.',
-    ].join('\n');
+      'Pressing keys: t is middle C, 1–0 q–p a–l z–m are the natural keys from C2 up, Shift plays a sharp, [ ] around keys plays a chord in one slot, - holds, a space rests. Press keys, don\'t type text: the page has no text box. With Claude in Chrome, send a part as key actions with the characters separated by spaces, the word "space" for a rest and the literal characters otherwise, not key names like "minus"; a long part can go in a few actions, in order.',
+      '',
+      'Playing several instruments yourself? Take them one tab at a time: each tab\'s "Copy agent prompt" gives that instrument\'s parts.',
+      'Tell me what your "Played notes" line, just above the keys, said.',
+    ];
+    return lines.join('\n');
   }
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* try the old way */ }
@@ -1370,6 +1409,8 @@
       parts.push(line);
     }
     statusEl.replaceChildren(...parts.flatMap((part, i) => i ? [' · ', part] : [part]));
+    // the players' names are tags inside the sentence, which some agent tools drop: name it whole too
+    if (statusEl.textContent) statusEl.setAttribute('aria-label', statusEl.textContent); else statusEl.removeAttribute('aria-label');
     togetherHow.hidden = !together();
     if (stageMode) renderStrips();
     // with a stage open, a player stays silent: the stage plays everyone, once
@@ -1475,6 +1516,7 @@
     stripsEl.appendChild(el);
     return st;
   }
+  const SCORE_ORDER = ['musicbox', 'marimba', 'piano', 'epiano', 'harpsichord', 'organ'];
   function renderStrips() {
     const list = players();
     for (const [id, st] of strips) if (!peers.has(id) || peers.get(id).role === 'stage') { st.el.remove(); strips.delete(id); }
@@ -1496,6 +1538,10 @@
       stripsEl.appendChild(empty);
     }
     if (list.length && empty) empty.remove();
+    // score order, whoever joined first: the high instruments on top, the bass at the bottom
+    const rank = id => SCORE_ORDER.indexOf((peers.get(id) || {}).instrument);
+    [...strips.keys()].sort((a, b) => rank(a) - rank(b) || peers.get(a).seat - peers.get(b).seat)
+      .forEach(id => stripsEl.appendChild(strips.get(id).el));
   }
   function stripKey(st, m, vel, delta) {
     const n = (st.lit.get(m) || 0) + delta, el = st.keys.get(m);
