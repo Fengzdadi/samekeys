@@ -1,33 +1,26 @@
 # Same Keys
 
-One web page, six instruments on the same keys, no server. People play it with a mouse, a touchscreen or the keyboard. AI agents play it the same way, through screenshots, clicks and typed keystrokes. There is no API, on purpose.
+One web page, six instruments on the same keys, no server. People play it with a mouse, a touchscreen or the keyboard. AI agents play it the same way, through screenshots, clicks and keystrokes. There is no API, on purpose.
 
 **Play it:** https://fengzdadi.github.io/samekeys/
 
 ## How to play
 
-- `1–0 q–p a–l z–m` are the natural keys from C2 up. `t` is middle C. `Shift` adds a sharp. Hold `Space` to sustain.
-- Type fast and the notes play in time, one character per eighth note: a space is a rest, `[ ]` plays a chord, `-` holds the last note.
-- The line above the keys shows what you played; a dash after a note is a typed hold, one per beat: `E4——`.
+- `1–0 q–p a–l z–m` are the natural keys from C2 up; `t` is middle C. `Shift` adds a sharp. Hold `Space` to sustain.
+- Press keys quickly and they play in time, one character per eighth note: a space is a rest, `[ ]` is a chord, `-` holds the last note.
 - Letter sheets written for virtualpiano.net work as they are.
 
-Try typing `tyu [io]- p  s d f  [tuo]--`.
+Try `tyu [io]- p  s d f  [tuo]--`.
 
 ## Play together
 
-Open the page in several tabs of the same browser and pick a different instrument in each. Typed music waits in each tab ("Ready, waiting for Enter"); Enter in any tab counts everyone in and all the parts start together on the next bar. Esc stops everyone. Playing live, with the mouse or slow keys, always sounds at once.
+Open the page in several tabs of the same browser, one instrument each. Typed parts wait for Enter; Enter in any tab counts everyone in and all parts start on the next bar. Esc stops everyone. Live playing always sounds at once.
 
-To watch and hear everyone in one place, click **Stage** in one more tab. The stage shows every player's keyboard, each in its own instrument, lined up by pitch, and plays all of them; the player tabs go quiet so nothing sounds twice. Press Enter on the stage to start everyone.
-
-To share a performance, click **Record** on the stage. The browser asks to share the tab: choose this tab. Play, then click **Stop**, and a video of the stage with the whole ensemble's sound is saved: MP4 where the browser can write it (Chrome does), otherwise WebM. If no picture is shared (you decline, or you're on a phone), it records the sound alone. Keep the stage in its own window, in front: a tab in the background stops drawing.
-
-## Songbook
-
-The page has a songbook: whole pieces with a part for each instrument, all at the same tempo and the same length, so any set of tabs lines up. Click **Songbook** at the top and choose a piece: your instrument's part appears above the keys, to read and press. Classics (Canon in C, Ode to Joy, Twinkle Twinkle) and a piece written by AI: Four AIs, One Lead Sheet, where four AI agents each wrote their own part alone from one lead sheet, then played it together.
+Click **Stage** in one more tab to see every player's keyboard and hear the whole ensemble there. Press Enter on the stage to start. **Record** on the stage saves a video of the performance (MP4 in Chrome, otherwise WebM; sound only if no picture is shared). Keep the stage in its own window, in front.
 
 ## Play with your agent
 
-Each tab's **Copy agent prompt** copies instructions for the instrument chosen in that tab: how to play through the page, its part in every piece of the songbook, and a lead sheet to write its own. Paste it to an AI agent that can use your browser (Claude in Chrome, for example). Several agents, one tab each, make an ensemble; one agent can also take the tabs one at a time. Open a stage in its own window to watch and hear them all, then press Enter there.
+**Copy agent prompt** copies instructions for the instrument chosen in that tab, including its part in every piece of the songbook. Paste it to an agent that can use your browser (Claude in Chrome, for example). Several agents, one tab each, make an ensemble.
 
 ## Run it locally
 
