@@ -17,7 +17,9 @@ Try typing `tyu [io]- p  s d f  [tuo]--`.
 
 Open the page in several tabs of the same browser and pick a different instrument in each. Typed music waits in each tab ("Ready, waiting for Enter"); Enter in any tab counts everyone in and all the parts start together on the next bar. Esc stops everyone. Playing live, with the mouse or slow keys, always sounds at once.
 
-To watch and hear everyone in one place, click **Stage** in one more tab. The stage shows every player's keyboard, each in its own instrument, lined up by pitch, and plays all of them; the player tabs go quiet so nothing sounds twice. Press Enter on the stage to start everyone. To share a performance, record the stage tab with any screen recorder.
+To watch and hear everyone in one place, click **Stage** in one more tab. The stage shows every player's keyboard, each in its own instrument, lined up by pitch, and plays all of them; the player tabs go quiet so nothing sounds twice. Press Enter on the stage to start everyone.
+
+To share a performance, click **Record** on the stage. The browser asks to share the tab: choose this tab. Play, then click **Stop**, and a video of the stage with the whole ensemble's sound is saved: MP4 where the browser can write it (Chrome does), otherwise WebM. If no picture is shared (you decline, or you're on a phone), it records the sound alone. Keep the stage in its own window, in front: a tab in the background stops drawing.
 
 ## Play with your agent
 

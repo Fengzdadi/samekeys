@@ -7,6 +7,9 @@ const assert = require('assert');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
 let clipboard = '';   // what the page last copied
+// Recording: whether the browser can write MP4, whether the person shares the tab's picture, and the
+// names of the files the page saved.
+const recording = { mp4: true, share: true, saved: [] };
 
 // One fake clock for every window. Page timers, performance.now(), Date.now(), the audio clock and the
 // messages between tabs all run on it, and the test moves it forward, so the results depend on the code
@@ -63,7 +66,7 @@ class FakeChannel {
 class FakeParam { constructor(v) { this.value = v; } setValueAtTime() {} linearRampToValueAtTime() {} setTargetAtTime() {} cancelScheduledValues() {} }
 class FakeNode {
   constructor() { for (const p of ['gain', 'frequency', 'playbackRate', 'threshold', 'ratio', 'attack', 'release']) this[p] = new FakeParam(0); }
-  connect(n) { return n; } start() {} stop() {} setPeriodicWave() {}
+  connect(n) { return n; } disconnect() {} start() {} stop() {} setPeriodicWave() {}
 }
 class FakeCtx {
   constructor() { this.state = 'running'; this.destination = new FakeNode(); this.t0 = clock.now; }
@@ -75,6 +78,7 @@ class FakeCtx {
   createPeriodicWave() { return {}; }
   createBuffer(ch, len, sr) { const data = new Float32Array(len); return { duration: len / sr, getChannelData: () => data }; }
   decodeAudioData() { return Promise.resolve({ duration: 1 }); }
+  createMediaStreamDestination() { return Object.assign(new FakeNode(), { stream: { getAudioTracks: () => [{ kind: 'audio' }] } }); }
 }
 // Each group of windows gets its own channel name, so windows from earlier checks don't join later ones.
 // Each window's Math.random is a fixed sequence that starts higher for each window opened, so tab ids
@@ -88,8 +92,11 @@ function load({ offline = false, room = 'solo', lag = 0 } = {}) {
       w.AudioContext = FakeCtx;
       let seed = ++windowsOpened;
       w.Math.random = () => (seed = seed * 16807 % 2147483647) / 2147483647;
-      w.setTimeout = (fn, ms, ...args) => clock.set(() => fn(...args), (Number(ms) || 0) + lag);
-      w.setInterval = (fn, ms, ...args) => clock.set(() => fn(...args), (Number(ms) || 0) + lag, Math.max(1, Number(ms) || 0));
+      // a closed page runs nothing more: its timers stop once its pagehide handlers have run
+      let closed = false;
+      w.addEventListener('pagehide', () => queueMicrotask(() => { closed = true; }));
+      w.setTimeout = (fn, ms, ...args) => clock.set(() => closed || fn(...args), (Number(ms) || 0) + lag);
+      w.setInterval = (fn, ms, ...args) => clock.set(() => closed || fn(...args), (Number(ms) || 0) + lag, Math.max(1, Number(ms) || 0));
       w.clearTimeout = w.clearInterval = id => clock.clear(id);
       const opened = clock.now;
       w.performance.now = () => clock.now - opened;
@@ -100,6 +107,21 @@ function load({ offline = false, room = 'solo', lag = 0 } = {}) {
         ? () => Promise.reject(new Error('offline'))
         : () => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
       Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: async text => { clipboard = text; } } });
+      Object.defineProperty(w.navigator, 'mediaDevices', { value: { getDisplayMedia: async () => {
+        if (!recording.share) throw new Error('declined');
+        const picture = { kind: 'video', stop() {}, addEventListener() {} };
+        return { getVideoTracks: () => [picture] };
+      } } });
+      w.MediaStream = class { constructor(tracks) { this.tracks = tracks; } };
+      w.MediaRecorder = class {
+        static isTypeSupported(type) { return recording.mp4 || !type.includes('mp4'); }
+        constructor(stream, options) { this.stream = stream; this.mimeType = (options && options.mimeType) || ''; }
+        start() {}
+        stop() { this.ondataavailable({ data: { size: 1 } }); this.onstop(); }
+      };
+      w.URL.createObjectURL = () => 'blob:recording';
+      w.URL.revokeObjectURL = () => {};
+      w.HTMLAnchorElement.prototype.click = function () { recording.saved.push(this.download); };
       w.HTMLElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, width: 20, height: 100, right: 20, bottom: 100 });
     }
   });
@@ -507,9 +529,36 @@ async function main() {
     assert.strictEqual(X.status(), 'You are Organ · Other tab: Organ 2', 'and both tabs agree');
   }
 
+  // Recording the stage: the tab's picture and the stage's own mix, saved when it stops.
+  const rec = S.d.getElementById('record');
+  assert.strictEqual(rec.textContent, 'Record');
+  rec.click(); await sleep(0);
+  assert.ok(S.status().endsWith('Recording'), 'the stage says it is recording');
+  await sleep(3000);
+  assert.strictEqual(rec.textContent, '■ Stop 0:03', 'the button counts the time, and stops it');
+  rec.click(); await sleep(0);
+  const lastSaved = () => recording.saved[recording.saved.length - 1];
+  assert.ok(/^Same Keys \d{4}-\d\d-\d\d \d\d\.\d\d\.mp4$/.test(lastSaved()), 'stopping saves an MP4: ' + lastSaved());
+  assert.ok(S.status().endsWith('Saved ' + lastSaved()), 'and says so, by name');
+  assert.strictEqual(rec.textContent, 'Record');
+  await sleep(9000);
+  assert.ok(!S.status().includes('Saved'), 'the note goes after a while');
+  recording.mp4 = false;
+  rec.click(); await sleep(0); rec.click(); await sleep(0);
+  assert.ok(lastSaved().endsWith('.webm'), 'WebM where the browser can\'t write MP4');
+  recording.mp4 = true; recording.share = false;
+  rec.click(); await sleep(0);
+  assert.ok(S.status().includes('sound only'), 'with no picture shared, it says it records the sound only');
+  rec.click(); await sleep(0);
+  assert.ok(lastSaved().endsWith('.m4a'), 'and saves the sound alone');
+  recording.share = true;
+  rec.click(); await sleep(0);
+  const savedBefore = recording.saved.length;
+
   // leaving the stage: back to a player, and the others hear themselves again
   S.d.getElementById('stage-toggle').click(); await sleep(50);
   assert.strictEqual(S.d.querySelectorAll('.strip').length, 0, 'the strips go');
+  assert.strictEqual(recording.saved.length, savedBefore + 1, 'leaving the stage mid-recording saves it');
   assert.strictEqual(P1.status(), 'You are Piano · Other tabs: Marimba, Piano 2', 'no stage any more; the stage is a second piano now');
   assert.strictEqual(S.d.title, 'Piano 2', 'a tab leaving the stage takes a free number');
 

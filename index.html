@@ -285,6 +285,9 @@
     background: linear-gradient(#26201B, #15110E);
   }
   .stage[data-mode="stage"] :is(.how, .fallboard, .keys-wrap, .played, .traces, #sustain, #labels) { display: none; }
+  #record { display: none; }
+  .stage[data-mode="stage"] #record { display: inline-block; }
+  .stage[data-mode="stage"] #record.on { background: var(--felt); border-color: var(--felt); color: var(--ivory); }
   .stage[data-mode="stage"] .controls button[aria-pressed="true"] { background: rgba(239,230,210,.12); border-color: rgba(239,230,210,.3); }
   .stage[data-mode="stage"] .controls button:hover { background: rgba(239,230,210,.08); }
   .stage[data-mode="stage"] .count { top: 8px; transform: none; text-align: right; font-size: 44px; }
@@ -457,6 +460,7 @@
   <div class="controls">
     <button type="button" id="agent-prompt">Copy agent prompt</button>
     <button type="button" id="stage-toggle" aria-pressed="false">Stage</button>
+    <button type="button" id="record">Record</button>
     <button type="button" id="sustain" aria-pressed="false">Sustain</button>
     <button type="button" id="labels" aria-pressed="true">Labels</button>
     <div class="group" role="group" aria-label="Tempo">
@@ -571,7 +575,7 @@
   // taken, so nobody is renamed mid-performance; it is taken afresh only when the instrument changes.
   let seat = 1;
   const labelOf = (id, n) => (INSTRUMENTS.find(i => i.id === id) || INSTRUMENTS[0]).name + (n > 1 ? ' ' + n : '');
-  let ctx = null, master = null, ready = false, opening = false, useSynth = false;
+  let ctx = null, master = null, mixOut = null, ready = false, opening = false, useSynth = false;   // mixOut: everything, as it goes to the speakers
   const samples = [];
   const nearest = m => samples.reduce((a, s) => Math.abs(s.midi - m) < Math.abs(a.midi - m) ? s : a);
 
@@ -609,6 +613,7 @@
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -16; comp.ratio.value = 3; comp.attack.value = 0.003; comp.release.value = 0.25;
     master.connect(comp).connect(ctx.destination);
+    mixOut = comp;
     await ctx.resume();
     await loadSamples(onProgress);
     useSynth = samples.length < 6;
@@ -1347,6 +1352,7 @@
     if (stageMode) {
       const n = others.length;
       parts.push(`Stage · ${n} player${n === 1 ? '' : 's'} · Enter starts everyone, Esc stops`);
+      if (recordText) parts.push(recordText);
     } else if (stageOpen()) parts.push('Stage is open: sound comes from the stage');
     else if (channel && !others.length) parts.push('Alone here · open this page in another tab to play together');
     // with a namesake in the ensemble, say which one this tab is, so its player can find its strip
@@ -1588,6 +1594,7 @@
   const stageBtn = document.getElementById('stage-toggle');
   function setStage(on) {
     if (!ready) return;
+    if (!on) stopRecording();
     panic();   // this tab's own notes and waiting part end here
     stageMode = on;
     const main = document.querySelector('.stage');
@@ -1600,6 +1607,78 @@
     send('here');
   }
   stageBtn.addEventListener('click', () => { setStage(!stageMode); stageBtn.blur(); });
+
+  /* ---------- recording the stage ---------- */
+  // Record makes a video of the stage: the picture of this tab (the browser asks to share it, every time)
+  // and the stage's own mix as the sound, straight from the audio graph, so it is clean and in sync. It is
+  // saved when it stops: MP4 where the browser can write it, since phones and chat apps play that, else
+  // WebM. Without a picture (sharing declined, or a phone) it records the sound alone.
+  const recordBtn = document.getElementById('record');
+  let recorder = null, recordTicker = 0, recordStarted = 0, recordText = '', recordTextTimer = 0;
+  const firstType = types => types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  const stamp = () => {
+    const d = new Date(Date.now()), p2 = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}.${p2(d.getMinutes())}`;
+  };
+  function showRecordText(text, forMs) {
+    recordText = text;
+    clearTimeout(recordTextTimer);
+    if (forMs) recordTextTimer = setTimeout(() => { recordText = ''; renderStatus(); }, forMs);
+    renderStatus();
+  }
+  function renderRecordButton() {
+    const s = recorder ? Math.floor((performance.now() - recordStarted) / 1000) : 0;
+    recordBtn.textContent = recorder ? `■ Stop ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Record';
+    recordBtn.classList.toggle('on', !!recorder);
+  }
+  async function startRecording() {
+    if (!ready || recorder || !window.MediaRecorder) return;
+    let picture = null;
+    try {
+      const shared = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 }, audio: false, preferCurrentTab: true, selfBrowserSurface: 'include',
+      });
+      picture = shared.getVideoTracks()[0];
+    } catch (e) { /* declined, or no screen sharing here: the sound alone */ }
+    const sound = ctx.createMediaStreamDestination();
+    mixOut.connect(sound);
+    const type = picture
+      ? firstType(['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm'])
+      : firstType(['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']);
+    // the browsers' default audio rate is speech quality, about 30 kbps: music needs more
+    const rec = new MediaRecorder(new MediaStream([...(picture ? [picture] : []), ...sound.stream.getAudioTracks()]),
+      { ...(type && { mimeType: type }), audioBitsPerSecond: 192000, videoBitsPerSecond: 5000000 });
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      mixOut.disconnect(sound);
+      if (picture) picture.stop();
+      const kind = rec.mimeType || type;
+      const name = `Same Keys ${stamp()}.${kind.includes('mp4') ? (picture ? 'mp4' : 'm4a') : 'webm'}`;
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob(chunks, { type: kind }));
+      link.download = name;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 60000);
+      showRecordText('Saved ' + name, 8000);
+    };
+    if (picture) picture.addEventListener('ended', stopRecording);   // "Stop sharing" in the browser's own bar
+    rec.start(1000);
+    recorder = rec;
+    recordStarted = performance.now();
+    recordTicker = setInterval(renderRecordButton, 500);
+    renderRecordButton();
+    showRecordText(picture ? 'Recording' : 'Recording the sound only (no picture was shared)');
+  }
+  function stopRecording() {
+    if (!recorder) return;
+    const rec = recorder;
+    recorder = null;
+    clearInterval(recordTicker);
+    renderRecordButton();
+    rec.stop();
+  }
+  recordBtn.addEventListener('click', () => { recordBtn.blur(); if (recorder) stopRecording(); else startRecording(); });
   if (channel) {
     channel.onmessage = ({ data: d }) => {
       if (!d || d.id === me) return;
