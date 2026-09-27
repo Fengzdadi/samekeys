@@ -922,7 +922,14 @@
   const queueEl = document.getElementById('queue');
   const heldEl = document.getElementById('held');
   let groups = [];
-  const groupText = g => g.midis.length > 1 ? '[' + g.midis.map(noteName).join(' ') + ']' : noteName(g.midis[0]);
+  // A note or chord, then one dash for every typed "-" that has held it so far: "E4——", "[F4 G4]—".
+  const groupText = g => (g.midis.length > 1 ? '[' + g.midis.map(noteName).join(' ') + ']' : noteName(g.midis[0])) + '—'.repeat(g.holds || 0);
+  function markHold(list, t, render) {
+    const g = list.find(g => g.t === t);
+    if (!g) return;
+    g.holds = (g.holds || 0) + 1;
+    render();
+  }
   function renderPlayed() {
     const line = playedEl.parentElement;
     playedEl.textContent = groups.map(groupText).join('  ');
@@ -965,7 +972,7 @@
   let bpm = 120;
   const slotDur = () => 60 / bpm / 2;               // one character = one eighth note
   const barDur = () => 60 / bpm * 4;
-  const typing = { active: false, holding: false, anchor: 0, slot: 0, chord: null, lastNotes: [], pending: [] };
+  const typing = { active: false, holding: false, anchor: 0, slot: 0, chord: null, lastNotes: [], lastVoices: [], lastWhen: null, pending: [] };
   function addPending(ch, when) { typing.pending.push({ ch, when }); renderQueue(); }
   // With other tabs open, typed characters wait here until someone presses Enter.
   const held = [];
@@ -980,9 +987,13 @@
     let at = typing.anchor + s * sd;
     // If the grid has fallen behind real time, move it 60 ms ahead so the rest of this slot (a chord being typed) lands together.
     if (at < ctx.currentTime + 0.005) { const shift = ctx.currentTime + 0.06 - at; typing.anchor += shift; at += shift; }
-    if (ch === '[') { if (!typing.chord) { typing.chord = []; addPending('[', at); } return; }
+    if (ch === '[') { if (!typing.chord) { typing.chord = []; typing.chordVoices = []; addPending('[', at); } return; }
     if (ch === ']') {
-      if (typing.chord) { typing.lastNotes = typing.chord; typing.chord = null; addPending(']', at); typing.slot = s + 1; }
+      if (typing.chord) {
+        Object.assign(typing, { lastNotes: typing.chord, lastVoices: typing.chordVoices, chord: null });
+        if (typing.lastNotes.length) typing.lastWhen = at;
+        addPending(']', at); typing.slot = s + 1;
+      }
       return;
     }
     if (ch === ' ') { if (typing.chord) return; addPending(' ', at); typing.slot = s + 1; return; }
@@ -990,6 +1001,10 @@
       if (typing.chord) return;
       const end = typing.anchor + (s + 1) * sd;
       for (const m of typing.lastNotes) scheduleOff(m, end - 0.01);
+      // the played line shows the hold when its slot comes, and so does a stage
+      const onset = typing.lastWhen;
+      if (onset != null) schedule((at - ctx.currentTime) * 1000, () => markHold(groups, onset, renderPlayed));
+      for (const v of typing.lastVoices) if (v && v.shared) send('hold', { n: v.shared, at: at + wallOffset() });
       addPending('-', at); typing.slot = s + 1;
       return;
     }
@@ -999,8 +1014,8 @@
     const v = noteOn(m, 0.68 + Math.random() * 0.08, when);
     scheduleOff(m, when + sd - 0.01, v);
     addPending(ch, when);
-    if (typing.chord) typing.chord.push(m);
-    else { typing.lastNotes = [m]; typing.slot = s + 1; }
+    if (typing.chord) { typing.chord.push(m); typing.chordVoices.push(v); }
+    else Object.assign(typing, { lastNotes: [m], lastVoices: [v], lastWhen: when, slot: s + 1 });
   }
 
   function setTempo(next, share = true) {
@@ -1063,7 +1078,7 @@
         typing.active = true;
         typing.holding = together();
         typing.anchor = lastDownAudio;
-        typing.slot = 0; typing.chord = null; typing.lastNotes = [];
+        Object.assign(typing, { slot: 0, chord: null, lastNotes: [], lastVoices: [], lastWhen: null });
         typing.pending = typing.pending.filter(p => p.when > ctx.currentTime);
         const prev = charToMidi.get(lastChar);
         if (prev != null) {
@@ -1073,7 +1088,9 @@
         }
         if (typing.holding) { if (prev != null) takeBack(prev); hold(lastChar); }
         else if (prev != null) {
-          typing.lastNotes = [prev]; typing.slot = 1;
+          // the first note already sounded live: it becomes slot 0 as it is, so a "-" after it holds it
+          const v = voices.get(prev);
+          Object.assign(typing, { lastNotes: [prev], lastVoices: [v], lastWhen: v ? v.when : typing.anchor, slot: 1 });
           addPending(lastChar, typing.anchor);
           scheduleOff(prev, typing.anchor + slotDur() - 0.01);
         } else if (lastChar === '[') { typing.chord = []; addPending('[', typing.anchor); }
@@ -1392,7 +1409,7 @@
     if (!held.length) return;
     const chars = held.splice(0);
     const stillTyping = typing.active && typing.holding;   // keys arriving now are held for the next Enter
-    Object.assign(typing, { holding: false, anchor: at, slot: 0, chord: null, lastNotes: [] });
+    Object.assign(typing, { holding: false, anchor: at, slot: 0, chord: null, lastNotes: [], lastVoices: [], lastWhen: null });
     chars.forEach(ch => typeToken(ch));
     Object.assign(typing, { active: stillTyping, holding: stillTyping, chord: null });
     renderQueue();
@@ -1546,6 +1563,19 @@
       if (e.lit) stripKey(e.st, e.m, 0, -1); else e.cut = true;
     });
   }
+  // A typed "-" on a player: the strip's line gets its dash in the same slot. A chord's notes each send
+  // one, so a slot is counted once per group.
+  function stageHold(d) {
+    const e = stageVoices.get(d.id + ':' + d.n);
+    if (!e) return;
+    const t = Math.max(ctx.currentTime, d.at - wallOffset()), slot = Math.round(t * 100);
+    schedule((t - ctx.currentTime) * 1000, () => {
+      const g = e.st.groups.find(g => g.t === e.when);
+      if (!g || (g.holdSlots ||= new Set()).has(slot)) return;
+      g.holdSlots.add(slot);
+      markHold(e.st.groups, e.when, () => renderStripLine(e.st));
+    });
+  }
   // A player that leaves mid-note takes its notes with it.
   function stageDrop(id) {
     for (const [key, e] of stageVoices) {
@@ -1577,6 +1607,7 @@
       peers.set(d.id, { role: d.role, instrument: d.instrument, seat: d.seat || 1, ready: d.ready, part: d.part || '', seen: Date.now() });
       if (d.type === 'note') { if (stageMode) stageNote(d); return; }
       if (d.type === 'off') { if (stageMode) stageOff(d); return; }
+      if (d.type === 'hold') { if (stageMode) stageHold(d); return; }
       if (d.type === 'hello') { tempoSettled = true; send('here'); }
       // two players took the same number for the same instrument: the one with the lower id keeps it
       if (!stageMode && d.role !== 'stage' && d.instrument === instrument.id && (d.seat || 1) === seat && d.id < me) {

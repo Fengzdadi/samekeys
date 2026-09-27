@@ -8,6 +8,7 @@ One web page, six instruments on the same keys, no server. People play it with a
 
 - `1–0 q–p a–l z–m` are the natural keys from C2 up. `t` is middle C. `Shift` adds a sharp. Hold `Space` to sustain.
 - Type fast and the notes play in time, one character per eighth note: a space is a rest, `[ ]` plays a chord, `-` holds the last note.
+- The line above the keys shows what you played; a dash after a note is a typed hold, one per beat: `E4——`.
 - Letter sheets written for virtualpiano.net work as they are.
 
 Try typing `tyu [io]- p  s d f  [tuo]--`.

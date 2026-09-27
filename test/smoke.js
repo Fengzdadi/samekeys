@@ -157,7 +157,7 @@ async function main() {
   await sleep(600);
   assert.strictEqual(played(), 'C4  C4  D4  E4', 'notes arrive one slot at a time');
   await sleep(1300);
-  assert.strictEqual(played(), 'C4  C4  D4  E4  [F4 G4]  A4', 'chord lands together, hold and rest take a slot each');
+  assert.strictEqual(played(), 'C4  C4  D4  E4  [F4 G4]—  A4', 'chord lands together, hold and rest take a slot each; the hold shows as a dash');
   assert.strictEqual(queue(), '', 'queue drains');
   await sleep(300);
   assert.strictEqual(d.querySelectorAll('.key.on').length, 0, 'nothing stays lit');
@@ -279,18 +279,18 @@ async function main() {
   for (const words of ['Open the piano', 'Ready, waiting for Enter', 'Played notes'])
     assert.ok(clipboard.includes('"' + words + '"') && html.includes(words), 'the prompt quotes "' + words + '" as the page says it');
   const parts = [
-    ['Organ', 'C3  F2  G2  C3'],
-    ['Harpsichord', '[C3 E3 G3]  [C3 E3 G3]  [C3 F3 A3]  [C3 F3 A3]  [B2 D3 G3]  [B2 D3 G3]  [C3 E3 G3]'],
-    ['Marimba', 'C4  E4  G4  E4  C4  F4  A4  F4  B3  D4  G4  D4  C4'],
-    ['Music box', 'E5  D5  C5  D5  F5  A5  G5  F5  E5  D5  C5'],
-    ['Piano', 'E4  D4  C4  D4  F4  A4  G4  F4  E4  D4  C4'],
-    ['Electric piano', '[C4 E4 G4]  [C4 E4 G4]  [C4 F4 A4]  [C4 F4 A4]  [B3 D4 G4]  [B3 D4 G4]  [C4 E4 G4]'],
+    ['Organ', 'C3———  F2———  G2———  C3———'],
+    ['Harpsichord', '[C3 E3 G3]—  [C3 E3 G3]—  [C3 F3 A3]—  [C3 F3 A3]—  [B2 D3 G3]—  [B2 D3 G3]—  [C3 E3 G3]———'],
+    ['Marimba', 'C4  E4  G4  E4  C4  F4  A4  F4  B3  D4  G4  D4  C4———'],
+    ['Music box', 'E5  D5  C5  D5  F5—  A5—  G5  F5  E5  D5  C5———'],
+    ['Piano', 'E4  D4  C4  D4  F4—  A4—  G4  F4  E4  D4  C4———'],
+    ['Electric piano', '[C4 E4 G4]—  [C4 E4 G4]—  [C4 F4 A4]—  [C4 F4 A4]—  [B3 D4 G4]—  [B3 D4 G4]—  [C4 E4 G4]———'],
   ];
   for (const [name, notes] of parts) {
     const part = clipboard.match(new RegExp('\\b' + name + ': ([^\\s,)]+)'))[1];
     pick(d, name);
     await typeString(part); await sleep(4500);
-    assert.ok(played().endsWith(notes), name + '\'s part in the prompt plays ' + notes);
+    assert.ok(played().endsWith(notes), name + '\'s part in the prompt plays ' + notes + ', got ' + played().slice(-80));
   }
   pick(d, 'Piano');
   await sleep(2500);
@@ -473,6 +473,10 @@ async function main() {
   await typeIn(P2, 'rty'); await sleep(50);
   S.key('keydown', 'Escape', 'Escape'); await sleep(50);
   assert.strictEqual(P2.held(), '', 'Esc on the stage clears the players\' waiting parts');
+  await typeIn(P2, '[qe]-'); await sleep(50);
+  S.key('keydown', 'Enter', 'Enter'); S.key('keyup', 'Enter', 'Enter'); await sleep(5000);
+  assert.ok(P2.played().endsWith('[F3 A3]—'), 'a held chord shows its dash on the player');
+  assert.ok(stripLine('marimba').endsWith('[F3 A3]—'), 'and one dash on the stage, not one per note');
 
   // A player in the background, silent while the stage plays, has its timers slowed down; the stage
   // must still release every key on time, not when the late player gets round to it.
@@ -490,6 +494,7 @@ async function main() {
   assert.strictEqual(organDown(), 1, 'a "-" still holds E4 on the stage');
   await sleep(300);
   assert.strictEqual(organDown(), 0, 'and the stage lets it go when the hold ends, not seconds later');
+  assert.ok(stripLine('organ').endsWith('C4  D4  E4—'), 'the stage shows the hold as a dash too');
   L.d.defaultView.dispatchEvent(new L.d.defaultView.Event('pagehide')); await sleep(50);
   assert.ok(!stripOf('organ'), 'a player that leaves takes its strip with it');
 
