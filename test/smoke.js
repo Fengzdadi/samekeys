@@ -325,6 +325,10 @@ async function main() {
   assert.ok(songbook.open, 'Songbook opens the dialog');
   assert.deepStrictEqual(choices().map(b => b.dataset.title), SONGBOOK.map(p => p.title), 'it lists every piece');
   assert.ok(choices()[0].textContent.includes('all six instruments'), 'and whom each piece is for');
+  assert.deepStrictEqual([...d.querySelectorAll('#songbook-list h3')].map(h => h.textContent), ['Classics', 'Written by AI'],
+    'in two categories, each with a heading');
+  assert.deepStrictEqual([...d.querySelectorAll('#songbook-list section')].map(g => [...g.querySelectorAll('button')].map(b => b.dataset.title)),
+    [['Canon in C', 'Ode to Joy', 'Twinkle Twinkle'], ['Four AIs, One Lead Sheet']], 'the classics first, the AI piece after');
   const playedBefore = played();
   key('keydown', 't'); key('keyup', 't'); await sleep(50);
   assert.strictEqual(played(), playedBefore, 'letters play nothing while the dialog is open');
@@ -336,12 +340,12 @@ async function main() {
   choose('Ode to Joy');
   assert.ok(!songbook.open, 'choosing a piece closes the songbook');
   assert.ok(!sheet.hidden && sheetPart() === shown(ode.parts.piano), 'and puts this tab\'s part on the stand, as plain text');
-  assert.ok(sheetAbout().includes('Your part, Piano'), 'saying whose part it is');
+  assert.ok(sheetAbout().startsWith('Ode to JoyLudwig van Beethoven · Piano part'), 'naming the piece, its composer and whose part it is');
   pick(d, 'Music box');
   assert.strictEqual(sheetPart(), shown(ode.parts.musicbox), 'the sheet follows the instrument');
   assert.ok(sheetPart().startsWith('(first press space 128 times, 32 s of rest) '), 'a long rest is counted, not shown as blanks');
   pick(d, 'Piano');
-  choose('Four Agents');
+  choose('Four AIs, One Lead Sheet');
   assert.strictEqual(sheetPart(), '', 'a piece without a part for this instrument shows none');
   assert.ok(sheetAbout().includes('No Piano part; it is for'), 'and says whom it is for');
   [...d.querySelectorAll('#sheet-about button')].find(b => b.textContent === 'Put away').click();
@@ -486,7 +490,7 @@ async function main() {
       Q.key('keydown', 'Backspace', 'Backspace'); await sleep(20);
       parts++;
     }
-    assert.strictEqual(parts, 22, 'six parts each for Canon, Ode to Joy and Twinkle, four for Four Agents');
+    assert.strictEqual(parts, 22, 'six parts each for Canon, Ode to Joy and Twinkle, four for the piece written by AI');
   }
 
   // --- a stage: one tab shows and plays every player; the players go quiet and send it their notes ---

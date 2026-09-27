@@ -78,32 +78,66 @@
      presses, and an agent finds by reading the page. */
   .stand { flex: 1; min-height: 0; overflow-y: auto; }
   .sheet { max-width: 1100px; }
+  .sheet-about { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 10px; font-size: 13px; color: var(--ink-2); }
+  /* a round (32 slots, 8 s) per group, with a drawn bar line between groups: it is not text, so the part
+     reads the same, and it can't be taken for a rest the way a gap could */
+  .sheet-part .round + .round::before {
+    content: ""; display: inline-block; width: 1px; height: 1.1em; margin: 0 .7em; vertical-align: -3px;
+    background: rgba(43,40,35,.4);
+  }
+  .sheet-about b { font-family: var(--serif); font-weight: 500; font-size: 17px; letter-spacing: .02em; color: var(--ink); }
   .sheet-about button {
-    font: inherit; color: var(--ink); background: none; cursor: pointer; margin-left: 6px;
-    border: 1px solid rgba(43,40,35,.25); border-radius: 999px; padding: 1px 9px;
+    margin-left: auto; font: inherit; font-size: 12.5px; color: var(--ink-2); background: none; border: 0; padding: 2px 0;
+    cursor: pointer; text-decoration: underline 1px; text-underline-offset: 3px;
   }
-  /* The songbook: the page's one dialog, opened from the top row to choose a piece. It scrolls when the
-     list is long; choosing puts that piece's part on the stand and closes it. */
+  .sheet-about button:hover { color: var(--ink); }
+  /* The songbook: the page's one dialog, opened from the top row to choose a piece. It looks like what it
+     is, a bound book of music: ivory paper, the red felt as its spine, a contents page with numbered pieces,
+     titles set like the nameplates and dotted leaders to their lengths. It scrolls when the list is long;
+     choosing a piece puts its part on the stand and closes it. */
   .songbook {
-    width: min(560px, calc(100vw - 32px)); max-height: min(70vh, 640px); padding: 0; overflow: hidden;
-    border: 0; border-radius: 10px; background: var(--ivory); color: var(--ink); font-family: var(--sans);
-    box-shadow: 0 18px 50px rgba(20,17,14,.35);
+    width: min(540px, calc(100vw - 32px)); max-height: min(78vh, 700px); padding: 0; overflow: hidden;
+    border: 0; border-left: 7px solid var(--felt); border-radius: 2px 4px 4px 2px;
+    background: linear-gradient(90deg, rgba(43,40,35,.07), rgba(43,40,35,0) 18px), var(--ivory);
+    color: var(--ink); font-family: var(--sans);
+    box-shadow: 0 28px 70px rgba(20,17,14,.42), 0 2px 6px rgba(20,17,14,.18);
   }
-  .songbook::backdrop { background: rgba(20,17,14,.35); }
-  .songbook-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 8px; }
-  .songbook-head h2 { margin: 0; font-size: 17px; font-weight: 500; }
-  .songbook-head button, .songbook-list button { font: inherit; color: var(--ink); cursor: pointer; }
-  .songbook-head button { background: none; border: 1px solid rgba(43,40,35,.25); border-radius: 999px; padding: 3px 11px; font-size: 13px; }
-  .songbook-note { margin: 0 20px 8px; font-size: 12.5px; color: var(--ink-2); }
-  .songbook-list { list-style: none; margin: 0; padding: 0 12px 14px; overflow-y: auto; max-height: calc(min(70vh, 640px) - 96px); }
+  .songbook[open] { display: flex; flex-direction: column; }
+  .songbook::backdrop { background: rgba(20,17,14,.42); }
+  .songbook-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin: 28px 34px 0; padding-bottom: 12px; border-bottom: 1px solid var(--brass);
+  }
+  .songbook-head h2 {
+    margin: 0; font-family: var(--serif); font-weight: 500; font-size: 21px; letter-spacing: .24em; text-transform: uppercase;
+  }
+  .songbook-head button {
+    font: inherit; font-size: 12.5px; color: var(--ink-2); background: none; border: 0; padding: 2px 0; cursor: pointer;
+    text-decoration: underline 1px; text-underline-offset: 3px;
+  }
+  .songbook-head button:hover { color: var(--ink); }
+  .songbook-list { margin: 0; padding: 4px 34px 0; overflow-y: auto; flex: 1; min-height: 0; }
+  .songbook-list ol { list-style: none; margin: 0; padding: 0; }
+  .songbook-list h3 {
+    margin: 16px 0 0; font-size: 11px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: var(--brass-deep);
+  }
+  .songbook-list li + li button { border-top: 1px solid rgba(43,40,35,.13); }
   .songbook-list button {
-    display: block; width: 100%; text-align: left; background: none; border: 1px solid transparent;
-    border-radius: 8px; padding: 10px 12px;
+    position: relative; display: grid; grid-template-columns: 38px 1fr; width: 100%; padding: 16px 0 15px;
+    text-align: left; font: inherit; color: var(--ink); background: none; border: 0; cursor: pointer;
   }
-  .songbook-list button:hover { background: rgba(43,40,35,.06); }
-  .songbook-list button[aria-pressed="true"] { background: rgba(43,40,35,.10); border-color: rgba(43,40,35,.18); }
-  .songbook-list b { display: block; font-weight: 500; font-size: 15px; }
-  .songbook-list span { display: block; font-size: 12.5px; color: var(--ink-2); }
+  .songbook-list .no { grid-row: 1 / span 3; padding-top: 4px; font-family: var(--serif); font-size: 15px; color: var(--brass-deep); }
+  .songbook-list .line { display: flex; align-items: baseline; gap: 10px; }
+  .songbook-list .line b { font-family: var(--serif); font-weight: 500; font-size: 20px; letter-spacing: .02em; }
+  .songbook-list .leader { flex: 1; border-bottom: 1px dotted rgba(43,40,35,.45); transform: translateY(-5px); }
+  .songbook-list .len { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .songbook-list .by { grid-column: 2; margin-top: 3px; font-size: 13px; color: var(--ink-2); }
+  .songbook-list .for { grid-column: 2; margin-top: 7px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+  .songbook-list button:hover .line b { color: var(--brass-deep); text-decoration: underline 1px; text-underline-offset: 5px; }
+  .songbook-list button[aria-pressed="true"]::before {   /* the piece on the stand now: a brass mark in the margin */
+    content: ""; position: absolute; left: -18px; top: 20px; bottom: 18px; width: 3px; background: var(--brass);
+  }
+  .songbook-note { margin: 0 34px; padding: 14px 0 22px; font-size: 12px; color: var(--ink-2); border-top: 1px solid rgba(43,40,35,.13); }
   .sheet p { margin: 0; }
   .sheet-about { font-size: 12.5px; color: var(--ink-2); }
   .sheet-part {
@@ -532,8 +566,8 @@
 
 <dialog class="songbook" id="songbook" aria-labelledby="songbook-title">
   <div class="songbook-head"><h2 id="songbook-title">Songbook</h2><button type="button" id="songbook-close">Close</button></div>
-  <p class="songbook-note">Whole pieces, a part for each instrument, all at tempo 120. Choose one: this tab's part appears above the keys.</p>
-  <ul class="songbook-list" id="songbook-list"></ul>
+  <div class="songbook-list" id="songbook-list"></div>
+  <p class="songbook-note">Every piece at tempo 120, a part for each instrument. Choose one, and this tab's part goes above the keys.</p>
 </dialog>
 
 <div class="gate" id="gate">
@@ -1271,11 +1305,10 @@
   });
   showInstrument();
   // The songbook: whole pieces, one part per instrument, all at tempo 120, every part of a piece the same
-  // length, so any set of tabs lines up. Canon, Ode to Joy and Twinkle are arranged for these six
-  // instruments; Four Agents is as its four AI players wrote it, for the four they played. README.md lists
-  // them all.
+  // length, so any set of tabs lines up. In two categories: classics arranged for these six instruments,
+  // and music written by AI, kept exactly as its players wrote it, for the instruments they played.
   const SONGBOOK = [
-    { title: "Canon in C", about: "Pachelbel; a ground bass under a canon of four voices, 2 min", parts: {
+    { title: "Canon in C", category: "Classics", by: "Johann Pachelbel", about: "a ground bass under a canon of four voices", parts: {
       piano: "[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[8wtu]---------------",
       epiano: "                                                                                                u---y---t---r---e---w---e---r---t---r---e---w---q---0---q---9---8-0-w-q-0-8-0-9-8-6-8-w-q-e-w-q-0-8-9-r-t-u-o-w-e-q-w-0-8-t-t-r-uytyyrwrte0erw0weq8qw080etipoiyrtyutrtyrertewerwqweq0qw0qetiwryif---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---u---y---t---r---e---w---e---r---t---r---e---w---q---0---q---9---8-0-w-q-0-8-0-9-8-6-8-w-q-e-w-q-t---------------",
       harpsichord: "f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgx---z---l---k---j---h---j---k---l---k---j---h---g---f---g---d---f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgs---------------",
@@ -1283,13 +1316,7 @@
       marimba: "                                f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgx---z---l---k---j---h---j---k---l---k---j---h---g---f---g---d---f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdao---------------",
       musicbox: "                                                                f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-fdsddaoaspupaouopitioutupsgjhgdasdfsasdapaspopaoiopiuiouipsgoadgx---z---l---k---j---h---j---k---l---k---j---h---g---f---g---d---f---d---s---a---p---o---p---a---s---a---p---o---i---u---i---y---t-u-o-i-u-t-u-y-t-e-t-o-i-p-o-i-u-t-y-a-s-f-h-o-p-i-o-u-t-s-s-a-u---------------",
     } },
-    { title: "Four Agents", about: "written by four AI agents, each alone, from one lead sheet, 2 min", parts: {
-      harpsichord: "                                [wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-8w0wwyryeutu0rwrqtet8w0wqtetwyry8w0wwyryeutu0rwrqtet8w0wqtetwyry8wtuwryoetup0wruqeti8wtuqetiwryo8wtuwryoetup0wruqeti8wtuqetiwryo[wtu] [wtu][wtu][wry] [wry][wry][etu] [etu][etu][wru] [wru][wru][eti] [eti][eti][wtu] [wtu][wtu][eti] [eti][eti][wry] [wry][wry][wtu] [wtu][wtu][wry] [wry][wry][etu] [etu][etu][wru] [wru][wru][eti] [eti][eti][wtu] [wtu][wtu][eti] [eti][eti][wry] [wry][wry][8w]tuo[wr]yoa[et]ups[0w]rua[qe]tip[8w]tuo[qe]tip[wr]yoa[8w]tuo[wr]yoa[et]ups[0w]rua[qe]tip[8w]tuo[qe]tip[wr]yoa[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[8wu]---------------",
-      organ: "                                8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8--55--26--33--74--81--54--85--78--55--26--33--74--81--54--85--78-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8---5---6---3---4---1---4---5---[18]---------------",
-      marimba: "                                                                s---a---p---o---i---u---p---a---s---a---p---o---i---u---p---a-sds-dsa-sap-apo-poi-oiu-iop-opa-sds-dsa-sap-apo---i-oiu-iop-opa-sdf-gfd-fds-dsa-dfg-hgf-d-s-asd-fgf-hfd-fds-dsa-dfg-hgf-d-s-asd-fgh-gfd-a-s-dfh-gfg-sdf-ghg-fda-sdfghfdfdasdfsasdfgfsdf---g-fda-sds-dsa-sap-apo-poi-oiu-iop-opa-sd[us]---[ya]---[tp]---[uo]---[ip]---[us]---[ps]---[ad]---s-dsa---p-apo---i-oiu---p-opa---s---a---p---o---i---u---i---y---u---------------",
-      musicbox: "f-h-d---s-f-h---j-h-f---g-f-d---f-h-d---s-f-h---j-h-f---g-f-d---f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-h-d---s-f-h---j-h-f---g-f-d---l---k-h-j---h-k-l-j-h---j-g-k---l-kjk-jhj-ljk-hfg-jll-hfg-jgh-d-f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-  d-  s-  h-  j-  f-  g-  d-  f-h-d---s-f-h---j-h-f---g-f-d---f-ghd-fds-dfh-gfj-kjh-f-g-fdd---l---k-h-j---h-k-l-j-h---j-g-k---l-kjk-jhj-ljk-hfg-jll-hfg-jgh-d-f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-h-d---s-f-h---j-h-f---g-f-d---s---------------",
-    } },
-    { title: "Ode to Joy", about: "Beethoven; the whole theme, twice, 1 min", parts: {
+    { title: "Ode to Joy", category: "Classics", by: "Ludwig van Beethoven", about: "the whole theme, twice", parts: {
       piano: "u-u-i-o-o-i-u-y-t-t-y-u-u--yy---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---y-y-u-t-y-uiu-t-y-uiu-t-t-y-w---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---u-u-i-o-o-i-u-y-t-t-y-u-u--yy---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---y-y-u-t-y-uiu-t-y-uiu-t-t-y-w---u-u-i-o-o-i-u-y-t-t-y-u-y--tt---[tuo]---------------",
       epiano: "[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wr]---[wt]---[wt]---[wr]---[wt]---[wr]---[wr]---[wt]---[wt]---[wr]---[wr]---[wt]---[wt]---------------",
       harpsichord: "                                                                                                                                [80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[79w]-[79w]-[79w]-[79w]-[80w]-[80w]-[80w]---------------",
@@ -1297,7 +1324,7 @@
       marimba: "                                                                                                                                0wtwrywyrywy0wtw0wtwrywy0wtwrywy0wtwrywyrywy0wtw0wtwrywyrywy0wtwrywy0wtwrywy0wtwrywy0wtw0wtwrywy0wtwrywyrywy0wtw0wtwrywyrywy0wtwt---------------",
       musicbox: "                                                                                                                                f-f-g-h-h-g-f-d-s-s-d-f-f--dd---f-f-g-h-h-g-f-d-s-s-d-f-d--ss---d-d-f-s-d-fgf-s-d-fgf-s-s-d-o---f-f-g-h-h-g-f-d-s-s-d-f-d--ss---s---------------",
     } },
-    { title: "Twinkle Twinkle", about: "all three verses, twice, 50 s", parts: {
+    { title: "Twinkle Twinkle", category: "Classics", by: "traditional", about: "all three verses, twice", parts: {
       piano: "t-t-o-o-p-p-o---i-i-u-u-y-y-t---o-o-i-i-u-u-y---o-o-i-i-u-u-y---t-t-o-o-p-p-o---i-i-u-u-y-y-t---8w0w8w0wqtet8w0wqtet8w0w7w9w8w0w8w0wqtet8w0w7w9w8w0wqtet8w0w7w9w8w0w8w0wqtet8w0wqtet8w0w7w9w8w0w[tuo]---------------",
       epiano: "                                                                                                [wt]---[wt]---[et]---[wt]---[et]---[wt]---[wr]---[wt]---[wt]---[et]---[wt]---[wr]---[wt]---[et]---[wt]---[wr]---[wt]---[wt]---[et]---[wt]---[et]---[wt]---[wr]---[wt]---[wt]---------------",
       harpsichord: "                                                                                                [80w]-[80w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[8qe]-[8qe]-[80w]-[80w]-[79w]-[79w]-[80w]-[80w]-[80w]---------------",
@@ -1305,12 +1332,26 @@
       marimba: "                                                                                                u---u---i---u---i---u---y---u---u---i---u---y---u---i---u---y---u---u---i---u---i---u---y---u---u---------------",
       musicbox: "                                                                                                s-s-h-h-j-j-h---g-g-f-f-d-d-s---h-h-g-g-f-f-d---h-h-g-g-f-f-d---s-s-h-h-j-j-h---g-g-f-f-d-d-s---s---------------",
     } },
+    { title: "Four AIs, One Lead Sheet", category: "Written by AI", by: "four AI agents", about: "each wrote its own part alone from one lead sheet, then they played it together", parts: {
+      harpsichord: "                                [wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-8w0wwyryeutu0rwrqtet8w0wqtetwyry8w0wwyryeutu0rwrqtet8w0wqtetwyry8wtuwryoetup0wruqeti8wtuqetiwryo8wtuwryoetup0wruqeti8wtuqetiwryo[wtu] [wtu][wtu][wry] [wry][wry][etu] [etu][etu][wru] [wru][wru][eti] [eti][eti][wtu] [wtu][wtu][eti] [eti][eti][wry] [wry][wry][wtu] [wtu][wtu][wry] [wry][wry][etu] [etu][etu][wru] [wru][wru][eti] [eti][eti][wtu] [wtu][wtu][eti] [eti][eti][wry] [wry][wry][8w]tuo[wr]yoa[et]ups[0w]rua[qe]tip[8w]tuo[qe]tip[wr]yoa[8w]tuo[wr]yoa[et]ups[0w]rua[qe]tip[8w]tuo[qe]tip[wr]yoa[wtu]-[wtu]-[wry]-[wry]-[etu]-[etu]-[wru]-[wru]-[eti]-[eti]-[wtu]-[wtu]-[eti]-[eti]-[wry]-[wry]-[wtu]---[wry]---[etu]---[wru]---[eti]---[wtu]---[eti]---[wry]---[8wu]---------------",
+      organ: "                                8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8---5---6---3---4---1---4---5---8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8--55--26--33--74--81--54--85--78--55--26--33--74--81--54--85--78-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-765-7-6-543-5-4-8-1-3-4-6-5-7-8-5-5-2-6-3-3-7-4-8-1-5-4-8-5-2-8---5---6---3---4---1---4---5---[18]---------------",
+      marimba: "                                                                s---a---p---o---i---u---p---a---s---a---p---o---i---u---p---a-sds-dsa-sap-apo-poi-oiu-iop-opa-sds-dsa-sap-apo---i-oiu-iop-opa-sdf-gfd-fds-dsa-dfg-hgf-d-s-asd-fgf-hfd-fds-dsa-dfg-hgf-d-s-asd-fgh-gfd-a-s-dfh-gfg-sdf-ghg-fda-sdfghfdfdasdfsasdfgfsdf---g-fda-sds-dsa-sap-apo-poi-oiu-iop-opa-sd[us]---[ya]---[tp]---[uo]---[ip]---[us]---[ps]---[ad]---s-dsa---p-apo---i-oiu---p-opa---s---a---p---o---i---u---i---y---u---------------",
+      musicbox: "f-h-d---s-f-h---j-h-f---g-f-d---f-h-d---s-f-h---j-h-f---g-f-d---f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-h-d---s-f-h---j-h-f---g-f-d---l---k-h-j---h-k-l-j-h---j-g-k---l-kjk-jhj-ljk-hfg-jll-hfg-jgh-d-f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-  d-  s-  h-  j-  f-  g-  d-  f-h-d---s-f-h---j-h-f---g-f-d---f-ghd-fds-dfh-gfj-kjh-f-g-fdd---l---k-h-j---h-k-l-j-h---j-g-k---l-kjk-jhj-ljk-hfg-jll-hfg-jgh-d-f-ghd-fds-dfh-gfj-kjh-f-g-fdd---f-h-d---s-f-h---j-h-f---g-f-d---s---------------",
+    } },
   ];
 
   // Copy agent prompt: instructions a person pastes to their own agent, for the instrument chosen in this
   // tab: its part in every piece, or a lead sheet to write its own. Each player, a person or an agent,
   // takes one tab; one agent can also take several, one tab at a time. The agent still plays through the
   // page like a person.
+  const pieceLength = p => {   // m:ss, from the parts: every slot is an eighth at tempo 120
+    const secs = Object.values(p.parts)[0].match(/\[[^\]]*\]|./g).length / 4;
+    return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  };
+  const pieceFor = p => {
+    const who = INSTRUMENTS.filter(i => p.parts[i.id]);
+    return who.length === INSTRUMENTS.length ? 'all six instruments' : who.map(i => i.name.toLowerCase()).join(', ');
+  };
   // A part that waits some rounds before it comes in starts with many spaces, which nobody can count in
   // a line of text: say how many instead.
   const showPart = part => {
@@ -1329,8 +1370,8 @@
       '',
       `Your parts, at tempo 120 (each character is one key press, one eighth note):`,
       ...SONGBOOK.map(p => p.parts[me.id]
-        ? `- ${p.title} (${p.about}): ${showPart(p.parts[me.id])}`
-        : `- ${p.title} (${p.about}): no ${me.name} part; it is for ${INSTRUMENTS.filter(i => p.parts[i.id]).map(i => i.name.toLowerCase()).join(', ')}.`),
+        ? `- ${p.title} (${p.by}; ${p.about}; ${pieceLength(p)}): ${showPart(p.parts[me.id])}`
+        : `- ${p.title} (${p.by}; ${p.about}; ${pieceLength(p)}): no ${me.name} part; it is for ${pieceFor(p)}.`),
       '',
       'Or write your own part over this lead sheet, two chords per bar, each 4 characters long: C G Am Em F C F G, 14 times, then a 16-character ending on a note of C major held with 15 "-", 464 characters in all. Say so to the other players, so every part is the same length.',
       '',
@@ -1346,35 +1387,47 @@
   const songbookEl = document.getElementById('songbook'), songbookList = document.getElementById('songbook-list');
   const sheetEl = document.getElementById('sheet');
   let piece = null;
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   function renderSheet() {
     for (const b of songbookList.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.title === (piece && piece.title)));
     sheetEl.hidden = !piece;
     if (!piece) return;
-    const part = piece.parts[instrument.id], about = document.getElementById('sheet-about');
-    about.textContent = `${piece.title}: ${piece.about}. ` + (part
-      ? `Your part, ${instrument.name}, at tempo 120, one character per eighth note:`
-      : `No ${instrument.name} part; it is for ${INSTRUMENTS.filter(i => piece.parts[i.id]).map(i => i.name.toLowerCase()).join(', ')}.`);
-    const away = document.createElement('button');
+    const part = piece.parts[instrument.id], away = el('button', null, 'Put away');
     away.type = 'button';
-    away.textContent = 'Put away';
     away.addEventListener('click', () => { piece = null; renderSheet(); });
-    about.append(away);
-    document.getElementById('sheet-part').textContent = part ? showPart(part) : '';
+    document.getElementById('sheet-about').replaceChildren(el('b', null, piece.title),
+      el('span', null, `${piece.by[0].toUpperCase() + piece.by.slice(1)} · ` + (part
+        ? `${instrument.name} part, one character per eighth note`
+        : `No ${instrument.name} part; it is for ${pieceFor(piece)}.`)), away);
+    const sheetPart = document.getElementById('sheet-part');
+    sheetPart.replaceChildren();
+    if (!part) return;
+    const rests = part.length - part.trimStart().length, slots = part.trimStart().match(/\[[^\]]*\]|./g) || [];
+    if (rests) sheetPart.append(`(first press space ${rests} times, ${rests / 4} s of rest) `);
+    for (let i = 0, first = (32 - rests % 32) % 32 || 32; i < slots.length; i += (i ? 32 : first))
+      sheetPart.append(el('span', 'round', slots.slice(i, i + (i ? 32 : first)).join('')));
   }
-  SONGBOOK.forEach(p => {
-    const li = document.createElement('li'), b = document.createElement('button'), t = document.createElement('b'), a = document.createElement('span');
+  SONGBOOK.forEach((p, n) => {
+    const li = el('li'), b = el('button'), line = el('span', 'line'), by = el('span', 'by', `${p.by[0].toUpperCase() + p.by.slice(1)}, ${p.about}`);
     b.type = 'button';
-    b.dataset.title = t.textContent = p.title;
-    a.textContent = `${p.about[0].toUpperCase() + p.about.slice(1)} · ${INSTRUMENTS.filter(i => p.parts[i.id]).length === INSTRUMENTS.length
-      ? 'all six instruments' : INSTRUMENTS.filter(i => p.parts[i.id]).map(i => i.name.toLowerCase()).join(', ')}`;
-    b.append(t, a);
+    b.dataset.title = p.title;
+    line.append(el('b', null, p.title), el('span', 'leader'), el('span', 'len', pieceLength(p)));
+    b.append(el('span', 'no', ROMAN[n] || String(n + 1)), line, by, el('span', 'for', 'For ' + pieceFor(p)));
     // named by its title alone, so a tool that searches by name finds "Canon in C" as a button
-    a.id = 'piece-' + SONGBOOK.indexOf(p);
+    by.id = 'piece-' + n;
     b.setAttribute('aria-label', p.title);
-    b.setAttribute('aria-describedby', a.id);
+    b.setAttribute('aria-describedby', by.id);
     b.addEventListener('click', () => { piece = p; renderSheet(); songbookEl.close(); });
     li.append(b);
-    songbookList.append(li);
+    let group = [...songbookList.children].find(g => g.dataset.category === p.category);
+    if (!group) {
+      group = el('section');
+      group.dataset.category = p.category;
+      group.append(el('h3', null, p.category), el('ol'));
+      songbookList.append(group);
+    }
+    group.querySelector('ol').append(li);
   });
   document.getElementById('songbook-open').addEventListener('click', e => { e.currentTarget.blur(); songbookEl.showModal(); });
   document.getElementById('songbook-close').addEventListener('click', () => songbookEl.close());
