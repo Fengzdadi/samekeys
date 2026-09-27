@@ -566,6 +566,11 @@
     { id: 'musicbox', name: 'Music box', voice: musicBox },
   ];
   let instrument = INSTRUMENTS[0];
+  // Two players with the same instrument are told apart by number: "Marimba", "Marimba 2". Each tab takes
+  // its own number and sends it, so every tab and the stage show the same names. A number is kept once
+  // taken, so nobody is renamed mid-performance; it is taken afresh only when the instrument changes.
+  let seat = 1;
+  const labelOf = (id, n) => (INSTRUMENTS.find(i => i.id === id) || INSTRUMENTS[0]).name + (n > 1 ? ' ' + n : '');
   let ctx = null, master = null, ready = false, opening = false, useSynth = false;
   const samples = [];
   const nearest = m => samples.reduce((a, s) => Math.abs(s.midi - m) < Math.abs(a.midi - m) ? s : a);
@@ -1172,7 +1177,7 @@
   function showInstrument() {
     document.querySelector('.stage').dataset.instrument = instrument.id;
     keysEl.setAttribute('aria-label', instrument.name + ' keys');
-    document.title = instrument.name;   // tells several tabs of the page apart
+    document.title = labelOf(instrument.id, seat);   // tells several tabs of the page apart
     for (const b of instrumentsEl.children) {
       b.setAttribute('aria-pressed', String(b.dataset.id === instrument.id));
       // on a narrow screen the names scroll inside the fallboard: keep the chosen one in view
@@ -1186,7 +1191,9 @@
     b.textContent = inst.name;
     b.addEventListener('click', () => {
       instrument = inst;
+      seat = takeSeat();
       showInstrument();
+      renderStatus();
       b.blur();
       send('here');
     });
@@ -1301,8 +1308,14 @@
   const together = () => peers.size > 0;
   const players = () => [...peers.entries()].filter(([, p]) => p.role !== 'stage');
   const stageOpen = () => [...peers.values()].some(p => p.role === 'stage');
+  function takeSeat() {   // the lowest number no other player of this instrument holds
+    const taken = new Set(players().filter(([, p]) => p.instrument === instrument.id).map(([, p]) => p.seat));
+    let n = 1;
+    while (taken.has(n)) n++;
+    return n;
+  }
   function send(type, extra) {
-    if (channel) channel.postMessage({ type, id: me, role: stageMode ? 'stage' : 'play', instrument: instrument.id, bpm, ready: held.length > 0, part: held.join(''), ...extra });
+    if (channel) channel.postMessage({ type, id: me, role: stageMode ? 'stage' : 'play', instrument: instrument.id, seat, bpm, ready: held.length > 0, part: held.join(''), ...extra });
   }
   // Reads as one line of text ("Other tabs: Organ, Piano (ready)"); each other tab is also a tag,
   // the seed of a stage where every player shows up.
@@ -1319,6 +1332,8 @@
       parts.push(`Stage · ${n} player${n === 1 ? '' : 's'} · Enter starts everyone, Esc stops`);
     } else if (stageOpen()) parts.push('Stage is open: sound comes from the stage');
     else if (channel && !others.length) parts.push('Alone here · open this page in another tab to play together');
+    // with a namesake in the ensemble, say which one this tab is, so its player can find its strip
+    if (!stageMode && others.some(p => p.instrument === instrument.id)) parts.push('You are ' + labelOf(instrument.id, seat));
     if (others.length && !stageMode) {
       const line = document.createDocumentFragment();
       line.append(others.length === 1 ? 'Other tab: ' : 'Other tabs: ');
@@ -1326,7 +1341,7 @@
         if (i) line.append(', ');
         const tag = document.createElement('span');
         tag.className = 'player' + (p.ready ? ' ready' : '');
-        tag.textContent = (INSTRUMENTS.find(x => x.id === p.instrument) || INSTRUMENTS[0]).name + (p.ready ? ' (ready)' : '');
+        tag.textContent = labelOf(p.instrument, p.seat) + (p.ready ? ' (ready)' : '');
         line.append(tag);
       });
       parts.push(line);
@@ -1443,8 +1458,8 @@
     for (const [id, p] of list) {
       const st = stripFor(id), inst = INSTRUMENTS.find(i => i.id === p.instrument) || INSTRUMENTS[0];
       st.el.dataset.instrument = inst.id;
-      st.el.setAttribute('aria-label', inst.name);
-      st.name.replaceChildren(inst.name);
+      st.el.setAttribute('aria-label', labelOf(inst.id, p.seat));
+      st.name.replaceChildren(labelOf(inst.id, p.seat));
       if (p.ready) { const r = document.createElement('span'); r.className = 'ready'; r.textContent = '(ready)'; st.name.append(r); }
       // a part stays on show through the count-in, until its notes take over on the downbeat
       const waiting = p.part || (countText ? st.waiting : '');
@@ -1547,7 +1562,7 @@
     stageMode = on;
     const main = document.querySelector('.stage');
     main.dataset.mode = on ? 'stage' : 'play';
-    if (on) { main.dataset.instrument = 'stage'; document.title = 'Stage'; } else showInstrument();
+    if (on) { main.dataset.instrument = 'stage'; document.title = 'Stage'; } else { seat = takeSeat(); showInstrument(); }
     stageBtn.setAttribute('aria-pressed', String(on));
     stageBtn.textContent = on ? 'Leave stage' : 'Stage';
     if (!on) { for (const st of strips.values()) st.el.remove(); strips.clear(); }
@@ -1559,10 +1574,16 @@
     channel.onmessage = ({ data: d }) => {
       if (!d || d.id === me) return;
       if (d.type === 'bye') { if (stageMode) stageDrop(d.id); peers.delete(d.id); renderStatus(); return; }
-      peers.set(d.id, { role: d.role, instrument: d.instrument, ready: d.ready, part: d.part || '', seen: Date.now() });
+      peers.set(d.id, { role: d.role, instrument: d.instrument, seat: d.seat || 1, ready: d.ready, part: d.part || '', seen: Date.now() });
       if (d.type === 'note') { if (stageMode) stageNote(d); return; }
       if (d.type === 'off') { if (stageMode) stageOff(d); return; }
       if (d.type === 'hello') { tempoSettled = true; send('here'); }
+      // two players took the same number for the same instrument: the one with the lower id keeps it
+      if (!stageMode && d.role !== 'stage' && d.instrument === instrument.id && (d.seat || 1) === seat && d.id < me) {
+        seat = takeSeat();
+        showInstrument();
+        send('here');
+      }
       if (d.type === 'tempo' || d.type === 'start' || (d.type === 'here' && !tempoSettled)) {
         tempoSettled = true;
         if (d.bpm !== bpm) setTempo(d.bpm, false);

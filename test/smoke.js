@@ -77,12 +77,17 @@ class FakeCtx {
   decodeAudioData() { return Promise.resolve({ duration: 1 }); }
 }
 // Each group of windows gets its own channel name, so windows from earlier checks don't join later ones.
+// Each window's Math.random is a fixed sequence that starts higher for each window opened, so tab ids
+// sort in the order the windows were opened and anything decided by id comes out the same every run.
+let windowsOpened = 0;
 // lag: this window's timers fire late, as in a silent background tab that the browser slows down
 function load({ offline = false, room = 'solo', lag = 0 } = {}) {
   const dom = new JSDOM(html, {
     runScripts: 'dangerously', pretendToBeVisual: true, url: 'http://localhost/',
     beforeParse(w) {
       w.AudioContext = FakeCtx;
+      let seed = ++windowsOpened;
+      w.Math.random = () => (seed = seed * 16807 % 2147483647) / 2147483647;
       w.setTimeout = (fn, ms, ...args) => clock.set(() => fn(...args), (Number(ms) || 0) + lag);
       w.setInterval = (fn, ms, ...args) => clock.set(() => fn(...args), (Number(ms) || 0) + lag, Math.max(1, Number(ms) || 0));
       w.clearTimeout = w.clearInterval = id => clock.clear(id);
@@ -324,7 +329,9 @@ async function main() {
   const typeIn = async (t, s) => { for (const ch of s) { t.key('keydown', ch); t.key('keyup', ch); await sleep(12); } };
   A.d.getElementById('open').click(); B.d.getElementById('open').click();
   await sleep(200);
-  assert.strictEqual(A.status(), 'Other tab: Piano', 'tabs find each other');
+  assert.strictEqual(A.status(), 'You are Piano · Other tab: Piano 2', 'tabs find each other; two pianos are told apart');
+  assert.strictEqual(B.status(), 'You are Piano 2 · Other tab: Piano', 'every tab shows the same names');
+  assert.strictEqual(B.d.title, 'Piano 2', 'and the tab title carries the number');
   assert.ok(!A.d.getElementById('together-how').hidden, 'the Enter / Esc line appears with another tab open');
   pick(B.d, 'Electric piano'); await sleep(50);
   assert.strictEqual(A.status(), 'Other tab: Electric piano', 'the other tab\'s instrument is shown');
@@ -422,6 +429,17 @@ async function main() {
   assert.strictEqual(P1.status(), 'Stage is open: sound comes from the stage · Other tab: Marimba',
     'a player learns where the sound went, and still sees the other player, not the stage');
 
+  // two players of the same instrument are numbered, and every tab agrees on the names
+  pick(P1.d, 'Marimba'); await sleep(50);
+  assert.deepStrictEqual([...S.d.querySelectorAll('.strip-name')].map(n => n.textContent), ['Marimba 2', 'Marimba'],
+    'the stage tells the two marimbas apart');
+  assert.strictEqual(P1.d.title, 'Marimba 2', 'the newcomer takes the next number');
+  assert.strictEqual(P1.status(), 'Stage is open: sound comes from the stage · You are Marimba 2 · Other tab: Marimba',
+    'and says which one it is');
+  pick(P1.d, 'Piano'); await sleep(50);
+  assert.strictEqual(P1.d.title, 'Piano', 'back to a piano of its own: no number');
+  assert.strictEqual(P2.d.title, 'Marimba', 'the other marimba keeps its name throughout');
+
   // live playing in a player tab lights its strip on the stage at once, and releases with it
   P1.key('keydown', 'o'); await sleep(30);
   assert.ok(P1.lit(67), 'the player still sees its own key');
@@ -475,11 +493,20 @@ async function main() {
   L.d.defaultView.dispatchEvent(new L.d.defaultView.Event('pagehide')); await sleep(50);
   assert.ok(!stripOf('organ'), 'a player that leaves takes its strip with it');
 
+  // two tabs that pick the same instrument at the same moment both take number 1; the lower id keeps it
+  {
+    const X = tab(load({ room: 'clash' })), Y = tab(load({ room: 'clash' }));
+    X.d.getElementById('open').click(); Y.d.getElementById('open').click(); await sleep(200);
+    pick(X.d, 'Organ'); pick(Y.d, 'Organ'); await sleep(50);
+    assert.deepStrictEqual([X.d.title, Y.d.title], ['Organ', 'Organ 2'], 'a clash settles on two different numbers');
+    assert.strictEqual(X.status(), 'You are Organ · Other tab: Organ 2', 'and both tabs agree');
+  }
+
   // leaving the stage: back to a player, and the others hear themselves again
   S.d.getElementById('stage-toggle').click(); await sleep(50);
   assert.strictEqual(S.d.querySelectorAll('.strip').length, 0, 'the strips go');
-  assert.strictEqual(P1.status(), 'Other tabs: Marimba, Piano', 'no stage any more');
-  assert.strictEqual(S.d.title, 'Piano');
+  assert.strictEqual(P1.status(), 'You are Piano · Other tabs: Marimba, Piano 2', 'no stage any more; the stage is a second piano now');
+  assert.strictEqual(S.d.title, 'Piano 2', 'a tab leaving the stage takes a free number');
 
   console.log('ok');
   process.exit(0);
