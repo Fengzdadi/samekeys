@@ -23,7 +23,7 @@ To share a performance, click **Record** on the stage. The browser asks to share
 
 ## Songbook
 
-The page has a songbook: whole pieces with a part for each instrument, all at the same tempo and the same length, so any set of tabs lines up. Click a piece's name after **Songbook:** above the keys and your instrument's part appears there, to read and press. Canon in C, Four Agents (written by four AI agents, each alone), Ode to Joy and Twinkle Twinkle.
+The page has a songbook: whole pieces with a part for each instrument, all at the same tempo and the same length, so any set of tabs lines up. Click **Songbook** at the top and choose a piece: your instrument's part appears above the keys, to read and press. Canon in C, Four Agents (written by four AI agents, each alone), Ode to Joy and Twinkle Twinkle.
 
 ## Play with your agent
 
