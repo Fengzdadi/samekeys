@@ -5,7 +5,6 @@ const path = require('path');
 const assert = require('assert');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
 // the page's songbook, read from its source
 const SONGBOOK = new Function('return ' + html.match(/const SONGBOOK = (\[[\s\S]*?\n  \]);/)[1])();
 let clipboard = '';   // what the page last copied
@@ -293,15 +292,13 @@ async function main() {
   assert.strictEqual(d.getElementById('status').textContent, 'Alone here · open this page in another tab to play together', 'alone: the ensemble line\'s empty state');
 
   // The agent prompt is a player's: this tab's instrument, its part in every piece of the songbook, or a
-  // lead sheet to write its own. The README carries the piano's, word for word, and every part.
+  // lead sheet to write its own.
   const promptBtn = d.getElementById('agent-prompt');
   promptBtn.click(); await sleep(0);
   assert.ok(promptBtn.textContent.startsWith('Copied'), 'the button says it copied');
   assert.ok(clipboard.startsWith('You are the Piano player in an ensemble'), 'the prompt is for this tab\'s instrument');
-  assert.ok(readme.includes(clipboard.replace('http://localhost/', 'https://fengzdadi.github.io/samekeys/')),
-    'the README carries the piano\'s prompt');
   assert.strictEqual(d.getElementById('played').getAttribute('aria-label'), 'Played notes', 'the played line has a name tools can find');
-  for (const words of ['Open the piano', 'Ready, waiting for Enter', 'Played notes'])
+  for (const words of ['Open the piano', 'Ready, waiting for Enter', 'Played notes', 'Songbook:'])
     assert.ok(clipboard.includes('"' + words + '"') && html.includes(words), 'the prompt quotes "' + words + '" as the page says it');
   const slotsOf = part => part.match(/\[[^\]]*\]|./g).length;
   const shown = part => { const r = part.length - part.trimStart().length; return r ? `(first press space ${r} times, ${r / 4} s of rest) ${part.trimStart()}` : part; };
@@ -310,10 +307,29 @@ async function main() {
     assert.ok(lengths.every(n => n === lengths[0]), piece.title + ': every part is the same length, ' + lengths);
     for (const [id, part] of Object.entries(piece.parts)) {
       assert.ok(/^[1-9a-z0 \-\[\]]+$/.test(part), piece.title + ' ' + id + ': only the page\'s notation');
-      assert.ok(readme.includes(': ' + shown(part) + '\n'), piece.title + ' ' + id + ' is in the README\'s songbook');
     }
-    assert.ok(clipboard.includes('- ' + piece.title + ' ('), 'the piano\'s prompt names ' + piece.title);
+    assert.ok(clipboard.includes('- ' + piece.title + ' (') && clipboard.includes(shown(piece.parts.piano || '') ), 'the piano\'s prompt carries its part in ' + piece.title);
   }
+
+  // The music stand: the songbook on the page, each piece a button; the chosen one shows this tab's part.
+  const bookButtons = [...d.querySelectorAll('#book button')], sheet = d.getElementById('sheet');
+  const sheetPart = () => d.getElementById('sheet-part').textContent, sheetAbout = () => d.getElementById('sheet-about').textContent;
+  assert.deepStrictEqual(bookButtons.map(b => b.textContent), SONGBOOK.map(p => p.title), 'every piece is named above the keys');
+  assert.ok(sheet.hidden, 'no sheet until a piece is chosen');
+  const ode = SONGBOOK.find(p => p.title === 'Ode to Joy');
+  bookButtons.find(b => b.textContent === 'Ode to Joy').click();
+  assert.ok(!sheet.hidden && sheetPart() === shown(ode.parts.piano), 'choosing a piece shows this tab\'s part, as plain text');
+  assert.ok(sheetAbout().includes('Your part, Piano'), 'and says whose part it is');
+  assert.strictEqual(bookButtons.find(b => b.getAttribute('aria-pressed') === 'true').textContent, 'Ode to Joy');
+  pick(d, 'Music box');
+  assert.strictEqual(sheetPart(), shown(ode.parts.musicbox), 'the sheet follows the instrument');
+  assert.ok(sheetPart().startsWith('(first press space 128 times, 32 s of rest) '), 'a long rest is counted, not shown as blanks');
+  pick(d, 'Piano');
+  bookButtons.find(b => b.textContent === 'Four Agents').click();
+  assert.strictEqual(sheetPart(), '', 'a piece without a part for this instrument shows none');
+  assert.ok(sheetAbout().includes('No Piano part; it is for'), 'and says who it is for');
+  bookButtons.find(b => b.textContent === 'Four Agents').click();
+  assert.ok(sheet.hidden, 'choosing the piece again puts the sheet away');
   // a whole piece from the songbook, played alone: Twinkle Twinkle's piano part ends on its held chord
   pick(d, 'Piano');
   await typeString(SONGBOOK.find(p => p.title === 'Twinkle Twinkle').parts.piano); await sleep(56000);

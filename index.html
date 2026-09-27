@@ -70,9 +70,28 @@
   button:focus-visible, .key:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 
   /* the wall: traces rise, played notes read out */
-  .wall { position: relative; flex: 1; min-height: 72px; }
+  .wall { position: relative; flex: 1; min-height: 72px; display: flex; flex-direction: column; gap: 10px; padding: 14px 28px; }
   /* the ensemble: other tabs of the page, one tag each; later, the players on a shared stage */
-  .status { position: absolute; left: 28px; right: 28px; top: 14px; margin: 0; font-size: 12.5px; color: var(--ink-2); }
+  .status { margin: 0; font-size: 12.5px; color: var(--ink-2); }
+  .status:empty { display: none; }
+  /* The music stand: the songbook's pieces by name, and the chosen piece's part for this tab's instrument,
+     as plain text a person reads and presses, and an agent finds by reading the page. */
+  .stand { flex: 1; min-height: 0; overflow-y: auto; }
+  .book { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 0; font-size: 12.5px; color: var(--ink-2); }
+  .book span { margin-right: 4px; }
+  .book button {
+    font: inherit; font-size: 13px; color: var(--ink); background: none; cursor: pointer;
+    border: 1px solid transparent; border-radius: 999px; padding: 3px 10px;
+  }
+  .book button:hover { background: rgba(43,40,35,.06); }
+  .book button[aria-pressed="true"] { background: rgba(43,40,35,.10); border-color: rgba(43,40,35,.18); }
+  .sheet { margin-top: 8px; max-width: 1100px; }
+  .sheet p { margin: 0; }
+  .sheet-about { font-size: 12.5px; color: var(--ink-2); }
+  .sheet-part {
+    margin-top: 4px !important; font-size: 15px; line-height: 1.7; letter-spacing: .08em; color: var(--ink);
+    word-break: break-all; font-variant-numeric: tabular-nums;
+  }
   .status .player {
     display: inline-block; padding: 1px 9px; border: 1px solid rgba(43,40,35,.22); border-radius: 999px;
     color: var(--ink);
@@ -88,10 +107,7 @@
   /* Guidance lives only in empty places and leaves as soon as they fill: the wall shows a phrase to try
      until the first note sounds. Nothing is remembered, so a friend at the same computer, or an agent
      using the same browser, sees it too. */
-  .hint {   /* where the first played notes will appear */
-    position: absolute; left: 28px; right: 28px; bottom: 16px; margin: 0;
-    font-size: 16px; color: var(--ink-2); pointer-events: none;
-  }
+  .hint { margin: 0; font-size: 16px; color: var(--ink-2); }   /* in the played line's place, until it fills */
   .hint kbd { font-size: 13px; line-height: 20px; min-width: 22px; }
   .stage[data-mode="stage"] .hint { display: none; }
   .traces { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
@@ -102,7 +118,7 @@
   }
   @keyframes rise { to { transform: translateY(-46vh); opacity: 0; } }
   .played {
-    position: absolute; left: 28px; right: 28px; bottom: 14px; margin: 0;
+    margin: auto 0 0;
     font-size: 20px; line-height: 1.3; white-space: pre; overflow: hidden; text-overflow: ellipsis;
     font-variant-numeric: tabular-nums; letter-spacing: .02em;
   }
@@ -284,7 +300,7 @@
     --ink: #EFE6D2; --ink-2: #CFC5AE;   /* text on the dark room, 10:1 or better */
     background: linear-gradient(#26201B, #15110E);
   }
-  .stage[data-mode="stage"] :is(.how, .fallboard, .keys-wrap, .played, .traces, #sustain, #labels) { display: none; }
+  .stage[data-mode="stage"] :is(.how, .fallboard, .keys-wrap, .played, .traces, .stand, #sustain, #labels) { display: none; }
   #record { display: none; }
   .stage[data-mode="stage"] #record { display: inline-block; }
   .stage[data-mode="stage"] #record.on { background: var(--felt); border-color: var(--felt); color: var(--ivory); }
@@ -294,8 +310,7 @@
   .stage[data-mode="stage"] .count.next { font-size: 18px; top: 16px; }
   .strips { display: none; }
   .stage[data-mode="stage"] .strips {
-    display: flex; flex-direction: column; gap: 16px;
-    position: absolute; inset: 64px 28px 20px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 0; overflow-y: auto; padding-top: 12px;
   }
   .strip { margin: 0; }
   .strip-name {
@@ -423,9 +438,8 @@
     .top { padding: 10px 16px 0; }
     .top { flex-direction: column; }
     .controls { margin-left: -11px; }
-    .played { left: 16px; right: 16px; font-size: 17px; }
-    .hint { left: 16px; right: 16px; }
-    .status { left: 16px; right: 16px; }
+    .wall { padding: 12px 16px; }
+    .played { font-size: 17px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .trace { display: none; }
@@ -476,8 +490,15 @@
   <div class="traces" id="traces" aria-hidden="true"></div>
   <p class="status" id="status" role="status"></p>
   <p class="count" id="count" aria-hidden="true"></p>
-  <p class="hint" id="hint">Press <kbd>t</kbd> <kbd>t</kbd> <kbd>o</kbd> <kbd>o</kbd> <kbd>p</kbd> <kbd>p</kbd> <kbd>o</kbd> to play Twinkle Twinkle, or click the keys.</p>
   <div class="strips" id="strips" role="group" aria-label="Players"></div>
+  <div class="stand" id="stand">
+    <p class="book" id="book" role="group" aria-label="Songbook"><span>Songbook:</span></p>
+    <div class="sheet" id="sheet" hidden>
+      <p class="sheet-about" id="sheet-about"></p>
+      <p class="sheet-part" id="sheet-part"></p>
+    </div>
+  </div>
+  <p class="hint" id="hint">Press <kbd>t</kbd> <kbd>t</kbd> <kbd>o</kbd> <kbd>o</kbd> <kbd>p</kbd> <kbd>p</kbd> <kbd>o</kbd> to play Twinkle Twinkle, or click the keys.</p>
   <p class="played"><span id="played" role="log" aria-live="polite" aria-label="Played notes"></span><span id="queue" class="queue" aria-hidden="true"></span><span id="held" class="held"></span></p>
 </div>
 
@@ -1217,6 +1238,7 @@
       seat = takeSeat();
       showInstrument();
       renderStatus();
+      renderSheet();
       b.blur();
       send('here');
     });
@@ -1277,7 +1299,7 @@
       `Page: ${location.origin + location.pathname}`,
       '',
       `1. Open the page and click "Open the piano", then click "${me.name}" in the row of instrument names on the dark band above the keys. Work in your own tab only, and bring it to the front before you click or press keys there: clicks and key presses sent to a tab that is not in front can be lost.`,
-      '2. Press your part for the piece I name (if I name none, the first below) in one quick burst. With other tabs of the page open, it waits: the line above the keys says "Ready, waiting for Enter". If yours is the only tab, it plays at once, so open another tab first.',
+      '2. Press your part for the piece I name (if I name none, the first below) in one quick burst. It is also on the page: click the piece\'s name after "Songbook:" above the keys, and your part appears there. With other tabs of the page open, it waits: the line above the keys says "Ready, waiting for Enter". If yours is the only tab, it plays at once, so open another tab first.',
       '3. Don\'t press Enter unless I ask you to start everyone: Enter in any tab counts everyone in, and every waiting part starts together on the next bar. Esc in any tab stops everything.',
       '',
       `Your parts, at tempo 120 (each character is one key press, one eighth note):`,
@@ -1294,6 +1316,26 @@
     ];
     return lines.join('\n');
   }
+  // The music stand: one button per piece; the chosen one shows this tab's part, and follows the instrument.
+  const bookEl = document.getElementById('book'), sheetEl = document.getElementById('sheet');
+  let piece = null;
+  function renderSheet() {
+    for (const b of bookEl.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.textContent === (piece && piece.title)));
+    sheetEl.hidden = !piece;
+    if (!piece) return;
+    const part = piece.parts[instrument.id];
+    document.getElementById('sheet-about').textContent = `${piece.title}: ${piece.about}. ` + (part
+      ? `Your part, ${instrument.name}, at tempo 120, one character per eighth note:`
+      : `No ${instrument.name} part; it is for ${INSTRUMENTS.filter(i => piece.parts[i.id]).map(i => i.name.toLowerCase()).join(', ')}.`);
+    document.getElementById('sheet-part').textContent = part ? showPart(part) : '';
+  }
+  SONGBOOK.forEach(p => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = p.title;
+    b.addEventListener('click', () => { piece = piece === p ? null : p; renderSheet(); b.blur(); });
+    bookEl.appendChild(b);
+  });
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* try the old way */ }
     const area = document.createElement('textarea');
